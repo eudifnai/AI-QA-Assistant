@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_name: str = "AI QA Assistant"
     api_host: Literal["127.0.0.1"] = "127.0.0.1"
     api_port: int = Field(default=8765, ge=1024, le=65535)
+    session_token: SecretStr | None = None
     database_url: str = "sqlite:///./.local-data/ai_qa_assistant.db"
     allowed_origins: tuple[str, ...] = (
         "http://localhost:1420",

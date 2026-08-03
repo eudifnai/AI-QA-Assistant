@@ -15,12 +15,18 @@ describe("ApiClient", () => {
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const client = new ApiClient("http://127.0.0.1:8765");
+    const client = new ApiClient("http://127.0.0.1:8765", "session-token");
 
     await expect(client.get<unknown>("/health")).resolves.toEqual({ status: "ok" });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8765/health",
-      expect.objectContaining({ method: "GET" }),
+      expect.objectContaining({
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer session-token",
+        },
+      }),
     );
   });
 

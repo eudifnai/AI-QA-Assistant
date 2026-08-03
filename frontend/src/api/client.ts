@@ -29,9 +29,11 @@ function asErrorPayload(value: unknown): ApiErrorPayload | null {
 
 export class ApiClient {
   private readonly baseUrl: string;
+  private readonly token: string | null;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, token: string | null = null) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.token = token;
   }
 
   async get<T>(path: string): Promise<T> {
@@ -39,9 +41,13 @@ export class ApiClient {
     const timeout = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
     try {
+      const headers: Record<string, string> = { Accept: "application/json" };
+      if (this.token !== null) {
+        headers.Authorization = `Bearer ${this.token}`;
+      }
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers,
         signal: controller.signal,
       });
 
@@ -77,4 +83,3 @@ export class ApiClient {
     }
   }
 }
-

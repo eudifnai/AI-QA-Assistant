@@ -45,15 +45,16 @@ pnpm install
 # 初始化本地数据库
 uv run alembic upgrade head
 
-# 终端 1：后端（固定绑定 127.0.0.1:8765）
-uv run python -m backend.app.run
-
-# 终端 2：桌面端
+# 桌面端（自动启动并回收 FastAPI 子进程）
 pnpm tauri dev
 ```
 
-打开桌面窗口后，首页会显示本地 FastAPI 的健康状态和后端版本。也可以访问
-`http://127.0.0.1:8765/health` 进行 HTTP 冒烟检查。
+桌面端每次启动都会创建随机回环端口和高熵会话令牌，通过 Tauri IPC 将连接信息交给
+Vue API Client；首页会显示本地 FastAPI 的健康状态和后端版本，窗口退出后后端随之停止。
+
+如需只调试浏览器界面，可分别运行 `uv run python -m backend.app.run` 和
+`pnpm --dir frontend dev:web`。此模式固定使用 `http://127.0.0.1:8765`；若配置
+`AI_QA_SESSION_TOKEN`，前端还需通过 `VITE_API_SESSION_TOKEN` 提供相同令牌。
 
 ## 开发环境要求
 
@@ -66,7 +67,8 @@ Windows 构建 Tauri 前，需要通过 Visual Studio Installer 安装“使用 
 本仓库提供 `AI-QA-Assistant.vsconfig`，可在 Installer 的“更多 → 导入配置”中直接导入，
 避免只安装 Visual Studio IDE 而缺少 `link.exe`、MSVC x64 工具链和 Windows SDK。
 
-当前 M0 骨架采用“独立启动 FastAPI + 固定开发端口”的方式。Python Sidecar、随机端口和启动令牌将在后续桌面安全切片实现；`/health` 不返回用户数据或敏感配置。
+当前源码开发版由 Tauri 使用项目 `.venv` 中的 Python 启动 FastAPI。安装包使用的独立
+Python Sidecar 可执行文件及签名流程属于阶段 6 打包切片，不在源码开发启动链路中隐式下载。
 
 ## 质量命令
 
@@ -80,5 +82,6 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+cargo test --manifest-path frontend/src-tauri/Cargo.toml
 pnpm tauri build
 ```
