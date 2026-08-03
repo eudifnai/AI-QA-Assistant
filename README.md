@@ -62,6 +62,10 @@ pnpm tauri dev
 - Node.js 24 和 pnpm 11。
 - Rust stable 及当前平台的 Tauri 2 系统依赖。
 
+Windows 构建 Tauri 前，需要通过 Visual Studio Installer 安装“使用 C++ 的桌面开发”工作负载。
+本仓库提供 `AI-QA-Assistant.vsconfig`，可在 Installer 的“更多 → 导入配置”中直接导入，
+避免只安装 Visual Studio IDE 而缺少 `link.exe`、MSVC x64 工具链和 Windows SDK。
+
 当前 M0 骨架采用“独立启动 FastAPI + 固定开发端口”的方式。Python Sidecar、随机端口和启动令牌将在后续桌面安全切片实现；`/health` 不返回用户数据或敏感配置。
 
 ## 质量命令
