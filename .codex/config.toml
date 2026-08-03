@@ -1,0 +1,7 @@
+# 仓库级 Codex 配置。个人密钥和个人偏好不要提交到本文件。
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+project_doc_max_bytes = 65536
+
+# 网络访问默认受沙箱和审批控制。安装依赖或访问外部文档时应显式批准。
+# 默认模型由个人或工作区配置决定，避免仓库绑定到可能变化的模型名称。

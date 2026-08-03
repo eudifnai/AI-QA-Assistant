@@ -1,0 +1,19 @@
+{
+  "name": "ai-qa-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "backend:dev": "uv run python -m backend.app.run",
+    "dev": "pnpm --dir frontend dev",
+    "lint": "pnpm --dir frontend lint",
+    "typecheck": "pnpm --dir frontend typecheck",
+    "test": "pnpm --dir frontend test",
+    "build": "pnpm --dir frontend build",
+    "tauri": "pnpm --dir frontend tauri"
+  }
+}
+
