@@ -29,19 +29,61 @@ function asErrorPayload(value: unknown): ApiErrorPayload | null {
 
 export class ApiClient {
   private readonly baseUrl: string;
+  private readonly token: string | null;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, token: string | null = null) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.token = token;
   }
 
   async get<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: "GET" });
+  }
+
+  async post<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "POST",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  async patch<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async put<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: "DELETE" });
+  }
+
+  private async request<T>(
+    path: string,
+    request: { method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT"; body?: string },
+  ): Promise<T> {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
     try {
+      const headers: Record<string, string> = { Accept: "application/json" };
+      if (this.token !== null) {
+        headers.Authorization = `Bearer ${this.token}`;
+      }
+      if (request.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+      }
       const response = await fetch(`${this.baseUrl}${path}`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
+        method: request.method,
+        headers,
+        body: request.body,
         signal: controller.signal,
       });
 
@@ -63,6 +105,10 @@ export class ApiClient {
         );
       }
 
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
       return (await response.json()) as T;
     } catch (error: unknown) {
       if (error instanceof ApiClientError) {
@@ -77,4 +123,3 @@ export class ApiClient {
     }
   }
 }
-

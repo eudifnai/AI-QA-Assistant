@@ -1,8 +1,25 @@
 packages:
   - frontend
 
+nodeLinker: hoisted
+
+overrides:
+  "@electron/rebuild@3.7.2>@electron/node-gyp": 10.2.0-electron.2
+  js-yaml: 4.3.1
+  nanoid: 3.3.18
+  tar: 7.5.21
+  tmp: 0.2.7
+
 allowBuilds:
+  electron: true
+  electron-winstaller: true
   esbuild: true
 
 verifyDepsBeforeRun: warn
 enableGlobalVirtualStore: false
+
+# Forge 7's @electron/packager dependency has no published fixed extract-zip
+# release yet. Keep this exact advisory exception visible and auditable.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-jmr9-qjv8-65gv

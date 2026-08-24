@@ -4,7 +4,19 @@ import { defineConfigWithVueTs, vueTsConfigs } from "@vue/eslint-config-typescri
 
 export default defineConfigWithVueTs(
   {
-    ignores: ["dist/**", "src-tauri/target/**"],
+    ignores: [".electron/**", "dist/**", "out/**"],
+  },
+  {
+    files: ["forge.config.cjs", "electron/*.cjs"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        module: "readonly",
+        process: "readonly",
+        require: "readonly",
+        URL: "readonly",
+      },
+    },
   },
   js.configs.recommended,
   pluginVue.configs["flat/essential"],
@@ -14,5 +26,10 @@ export default defineConfigWithVueTs(
       "vue/multi-word-component-names": "off",
     },
   },
+  {
+    files: ["forge.config.cjs", "electron/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 );
-

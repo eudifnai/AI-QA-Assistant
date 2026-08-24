@@ -14,7 +14,7 @@ Codex 负责：理解仓库、拆分任务、修改代码、运行命令、补�
 ## 2. 首次准备
 
 1. 安装 ChatGPT 桌面应用并进入 Codex 模式。
-2. 准备 Git、Python 3.12、uv、Node.js LTS、pnpm、Rust/Tauri 系统依赖。
+2. 准备 Git、Python 3.12、uv、Node.js 24 和 pnpm 11；Electron 由 pnpm 安装。
 3. 创建空 Git 仓库，将本文件包复制到仓库根目录。
 4. 在 Codex 中打开仓库根目录。
 5. 检查 `AGENTS.md` 和 `.codex/config.toml` 是否被识别。
@@ -60,7 +60,7 @@ Codex 按垂直切片交付：
 - 最小相关测试。
 - Python lint、格式、类型检查。
 - 前端 lint、类型检查、测试和构建。
-- 必要时 Tauri 打包冒烟测试。
+- 必要时 Electron package 和启动退出冒烟测试。
 - 变更 diff 自审。
 
 ### E. 人工审查
@@ -85,7 +85,7 @@ Codex 按垂直切片交付：
 
 ### 阶段 0：仓库与工程骨架
 
-产出：monorepo、FastAPI 健康接口、Vue/Tauri 窗口、SQLite 迁移、日志、配置和 CI。
+产出：monorepo、FastAPI 健康接口、Vue/Electron 窗口、SQLite 迁移、日志、配置和 CI。
 
 ### 阶段 1：本地工作空间
 
