@@ -2,11 +2,26 @@ name: Quality
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/release-*"]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      release_gate:
+        description: Release gate strictness
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - formal
+      previous_run_id:
+        description: Previous release-candidate run id for upgrade acceptance
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   backend:
@@ -40,12 +55,18 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # Forge 7 still depends on extract-zip 2.0.1; GHSA-jmr9-qjv8-65gv has no
+      # published patched package yet. Keep every other high advisory blocking.
       - run: pnpm audit --audit-level high
 
   desktop:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -53,9 +74,110 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tauri build
+      - run: uv sync --locked --all-groups
+      - run: pnpm installer:test
+      - name: Validate previous candidate input
+        if: github.event_name == 'workflow_dispatch' && inputs.previous_run_id != ''
+        shell: pwsh
+        env:
+          PREVIOUS_RUN_ID: ${{ inputs.previous_run_id }}
+        run: |
+          if ($env:PREVIOUS_RUN_ID -notmatch "^[1-9][0-9]*$") {
+            throw "Previous workflow run id must be a positive integer."
+          }
+      - name: Download previous Windows candidate
+        if: github.event_name == 'workflow_dispatch' && inputs.previous_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-candidate-${{ inputs.previous_run_id }}
+          path: ${{ runner.temp }}/ai-qa-previous-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.previous_run_id }}
+      - name: Prepare optional Windows signing certificate
+        shell: pwsh
+        env:
+          RELEASE_GATE: ${{ inputs.release_gate }}
+          SIGNING_PFX_BASE64: ${{ secrets.AI_QA_WINDOWS_SIGN_PFX_BASE64 }}
+          SIGNING_PFX_PASSWORD: ${{ secrets.AI_QA_WINDOWS_SIGN_PFX_PASSWORD }}
+        run: |
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:SIGNING_PFX_PASSWORD)
+          if ($hasCertificate -ne $hasPassword) {
+            throw "Windows signing certificate and password secrets must be configured together."
+          }
+          if ($env:RELEASE_GATE -eq "formal" -and -not $hasCertificate) {
+            throw "Formal release gate requires the Windows signing secrets."
+          }
+          if (-not $hasCertificate) {
+            Write-Output "No signing secret configured; building an unsigned internal candidate."
+            exit 0
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "ai-qa-release-signing.pfx"
+          [System.IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:SIGNING_PFX_BASE64)
+          )
+          "::add-mask::$env:SIGNING_PFX_PASSWORD"
+          "AI_QA_WINDOWS_SIGN_CERTIFICATE_FILE=$certificatePath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "AI_QA_WINDOWS_SIGN_CERTIFICATE_PASSWORD=$env:SIGNING_PFX_PASSWORD" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - run: pnpm electron:make
+      - name: Validate installer artifacts
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
+          -Mode Validate
+          -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance"
+      - name: Enforce formal release signing
+        if: github.event_name == 'workflow_dispatch' && inputs.release_gate == 'formal'
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
+          -Mode Validate
+          -RequireSignedArtifacts
+          -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance-formal"
+      - name: Exercise install, first launch, and uninstall
+        if: github.event_name != 'workflow_dispatch' || inputs.previous_run_id == ''
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
+          -Mode Lifecycle
+          -AllowSystemChanges
+          -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance"
+      - name: Exercise upgrade, first launch, and uninstall
+        if: github.event_name == 'workflow_dispatch' && inputs.previous_run_id != ''
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
+          -Mode Lifecycle
+          -PreviousArtifactRoot "$env:RUNNER_TEMP/ai-qa-previous-candidate"
+          -AllowSystemChanges
+          -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance"
+      - name: Archive Windows release candidate
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-candidate-${{ github.run_id }}
+          path: |
+            frontend/out/make/squirrel.windows/x64/AI-QA-Assistant-Setup.exe
+            frontend/out/make/squirrel.windows/x64/AIQAAssistant-*-full.nupkg
+            frontend/out/make/squirrel.windows/x64/RELEASES
+            frontend/out/make/ai-qa-assistant.cdx.json
+            frontend/out/make/RELEASE-METADATA.json
+            frontend/out/make/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove temporary signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "ai-qa-release-signing.pfx"
+          if (Test-Path -LiteralPath $certificatePath -PathType Leaf) {
+            Remove-Item -LiteralPath $certificatePath -Force
+          }
 
   dependency-review:
     if: github.event_name == 'pull_request'
@@ -77,4 +199,3 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

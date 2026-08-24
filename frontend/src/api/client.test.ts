@@ -56,4 +56,31 @@ describe("ApiClient", () => {
       }),
     );
   });
+
+  it("posts a JSON body with the session token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "workspace-1" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("http://127.0.0.1:8765", "session-token");
+
+    await expect(
+      client.post<unknown>("/api/workspaces", { name: "Demo", path: "C:\\qa\\demo" }),
+    ).resolves.toEqual({ id: "workspace-1" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8765/api/workspaces",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Demo", path: "C:\\qa\\demo" }),
+      }),
+    );
+  });
 });

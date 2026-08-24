@@ -13,7 +13,7 @@
 - 后端、AI 编排、文档解析、测试执行统一使用 Python 3.12。
 - API 使用 FastAPI；数据校验使用 Pydantic v2。
 - 业务数据库使用 SQLite + SQLModel + Alembic。
-- 桌面端使用 Tauri 2；界面使用 Vue 3 + TypeScript + Element Plus。
+- 桌面端使用 Electron；界面使用 Vue 3 + TypeScript + Element Plus。
 - Python 依赖由 `uv` 管理；前端依赖由 `pnpm` 管理。
 - 首期不得引入微服务、Kubernetes、Kafka、RabbitMQ、Celery、Redis 或远程 PostgreSQL。
 - 长任务必须运行在独立 Worker 进程，不得阻塞 FastAPI 事件循环。
@@ -74,7 +74,7 @@ pnpm build
 涉及桌面集成时增加：
 
 ```bash
-pnpm tauri build
+pnpm electron:package
 ```
 
 无法执行某项命令时，必须说明原因和替代验证，不得声称已通过。

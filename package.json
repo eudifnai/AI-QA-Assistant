@@ -13,7 +13,12 @@
     "typecheck": "pnpm --dir frontend typecheck",
     "test": "pnpm --dir frontend test",
     "build": "pnpm --dir frontend build",
-    "tauri": "pnpm --dir frontend tauri"
+    "backend:sidecar": "pnpm --dir frontend backend:sidecar",
+    "electron:package": "pnpm --dir frontend electron:package",
+    "electron:make": "pnpm --dir frontend electron:make",
+    "release:sbom": "uv run python scripts/release/generate_sbom.py --project-root . --output frontend/out/make/ai-qa-assistant.cdx.json",
+    "installer:test": "pwsh -NoProfile -File scripts/windows-release/Test-InstallerAcceptance.ps1",
+    "installer:validate": "pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 -Mode Validate",
+    "installer:validate:signed": "pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 -Mode Validate -RequireSignedArtifacts"
   }
 }
-

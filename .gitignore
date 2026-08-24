@@ -7,13 +7,21 @@ __pycache__/
 .coverage
 htmlcov/
 .cache/
+.test-tmp-*/
 
 node_modules/
 frontend/node_modules/
 frontend/dist/
-frontend/src-tauri/target/
-frontend/src-tauri/gen/
+frontend/.electron/
+frontend/.sidecar-build/
+frontend/.sidecar-dist/
+frontend/out/
+.electron-cache/
+.forge-temp/
 .pnpm-store/
+electron-windows-sign.log
+*.pfx
+*.p12
 
 .local-data/
 *.db

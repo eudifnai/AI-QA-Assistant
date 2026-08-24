@@ -37,6 +37,38 @@ export class ApiClient {
   }
 
   async get<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: "GET" });
+  }
+
+  async post<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "POST",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  async patch<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async put<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: "DELETE" });
+  }
+
+  private async request<T>(
+    path: string,
+    request: { method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT"; body?: string },
+  ): Promise<T> {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
@@ -45,9 +77,13 @@ export class ApiClient {
       if (this.token !== null) {
         headers.Authorization = `Bearer ${this.token}`;
       }
+      if (request.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+      }
       const response = await fetch(`${this.baseUrl}${path}`, {
-        method: "GET",
+        method: request.method,
         headers,
+        body: request.body,
         signal: controller.signal,
       });
 
@@ -67,6 +103,10 @@ export class ApiClient {
             traceId: typeof payload?.trace_id === "string" ? payload.trace_id : null,
           },
         );
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
       }
 
       return (await response.json()) as T;

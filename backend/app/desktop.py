@@ -1,34 +1,26 @@
-import argparse
-import ctypes
 import json
+import multiprocessing
 import os
 import secrets
 import socket
-import threading
+import sys
 import time
+from pathlib import Path
 
 import uvicorn
 
 from backend.app.core.config import get_settings
 from backend.app.core.logging import configure_logging
+from backend.app.core.network import API_LOOPBACK_HOST
+from backend.app.infrastructure.database_migrations import upgrade_database
 
 STARTUP_MESSAGE_TYPE = "backend_ready"
-PARENT_CHECK_INTERVAL_SECONDS = 1.0
+PARENT_HEARTBEAT_ENVIRONMENT_VARIABLE = "AI_QA_PARENT_HEARTBEAT_PATH"
+PARENT_HEARTBEAT_TIMEOUT_SECONDS = 5.0
 
 
 def generate_session_token() -> str:
     return secrets.token_urlsafe(32)
-
-
-def open_loopback_socket() -> socket.socket:
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        listener.bind(("127.0.0.1", 0))
-        listener.listen(2048)
-    except BaseException:
-        listener.close()
-        raise
-    return listener
 
 
 def create_startup_message(*, port: int, token: str) -> str:
@@ -39,87 +31,87 @@ def create_startup_message(*, port: int, token: str) -> str:
     )
 
 
-def parent_process_is_alive(parent_pid: int) -> bool:
-    if os.name != "nt":
-        try:
-            os.kill(parent_pid, 0)
-        except OSError:
-            return False
-        return True
-
-    synchronize = 0x00100000
-    wait_timeout = 0x00000102
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    open_process = kernel32.OpenProcess
-    open_process.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
-    open_process.restype = ctypes.c_void_p
-    wait_for_single_object = kernel32.WaitForSingleObject
-    wait_for_single_object.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-    wait_for_single_object.restype = ctypes.c_uint32
-    close_handle = kernel32.CloseHandle
-    close_handle.argtypes = [ctypes.c_void_p]
-    close_handle.restype = ctypes.c_int
-
-    handle = open_process(synchronize, 0, parent_pid)
-    if handle is None:
-        return False
+def parent_heartbeat_is_current(
+    heartbeat_path: Path,
+    *,
+    current_time: float | None = None,
+) -> bool:
     try:
-        return int(wait_for_single_object(handle, 0)) == wait_timeout
-    finally:
-        close_handle(handle)
+        modified_at = heartbeat_path.stat().st_mtime
+    except OSError:
+        return False
+    now = time.time() if current_time is None else current_time
+    return now - modified_at <= PARENT_HEARTBEAT_TIMEOUT_SECONDS
 
 
-def monitor_parent_process(parent_pid: int, server: uvicorn.Server) -> None:
-    while not server.should_exit:
-        if not parent_process_is_alive(parent_pid):
-            server.should_exit = True
+class DesktopServer(uvicorn.Server):
+    def __init__(
+        self,
+        config: uvicorn.Config,
+        session_token: str,
+        parent_heartbeat_path: Path,
+    ) -> None:
+        super().__init__(config)
+        self._session_token = session_token
+        self._parent_heartbeat_path = parent_heartbeat_path
+
+    async def on_tick(self, counter: int) -> bool:
+        if await super().on_tick(counter):
+            return True
+        if not parent_heartbeat_is_current(self._parent_heartbeat_path):
+            self.should_exit = True
+        return self.should_exit
+
+    async def startup(self, sockets: list[socket.socket] | None = None) -> None:
+        await super().startup(sockets=sockets)
+        if self.should_exit:
             return
-        time.sleep(PARENT_CHECK_INTERVAL_SECONDS)
-
-
-def parse_parent_pid() -> int:
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--parent-pid", type=int, required=True)
-    arguments = parser.parse_args()
-    if arguments.parent_pid <= 0:
-        parser.error("--parent-pid must be positive")
-    return int(arguments.parent_pid)
+        listeners = [
+            listener
+            for server in self.servers
+            for listener in (server.sockets or ())
+            if listener.family == socket.AF_INET
+        ]
+        if len(listeners) != 1:
+            raise RuntimeError("本地后端回环监听器初始化失败。")
+        host, port = listeners[0].getsockname()
+        if host != API_LOOPBACK_HOST or not 1024 <= port <= 65535:
+            raise RuntimeError("本地后端回环监听器校验失败。")
+        os.environ["AI_QA_API_PORT"] = str(port)
+        print(create_startup_message(port=port, token=self._session_token), flush=True)
 
 
 def main() -> None:
-    parent_pid = parse_parent_pid()
-    listener = open_loopback_socket()
     token = generate_session_token()
-    _, port = listener.getsockname()
-    os.environ["AI_QA_API_PORT"] = str(port)
     os.environ["AI_QA_SESSION_TOKEN"] = token
     get_settings.cache_clear()
 
-    try:
-        from backend.app.main import create_app
+    from backend.app.main import create_app
 
-        settings = get_settings()
-        configure_logging()
-        server = uvicorn.Server(
-            uvicorn.Config(
-                create_app(settings=settings),
-                host=settings.api_host,
-                port=settings.api_port,
-                reload=False,
-                log_config=None,
-            )
-        )
-        threading.Thread(
-            target=monitor_parent_process,
-            args=(parent_pid, server),
-            daemon=True,
-            name="desktop-parent-monitor",
-        ).start()
-        print(create_startup_message(port=port, token=token), flush=True)
-        server.run(sockets=[listener])
-    finally:
-        listener.close()
+    settings = get_settings()
+    parent_heartbeat_value = os.environ.get(PARENT_HEARTBEAT_ENVIRONMENT_VARIABLE)
+    if not parent_heartbeat_value:
+        raise RuntimeError("Electron 父进程心跳路径未配置。")
+    configure_logging()
+    upgrade_database(settings.database_url)
+    server = DesktopServer(
+        uvicorn.Config(
+            create_app(settings=settings),
+            host=API_LOOPBACK_HOST,
+            port=0,
+            reload=False,
+            log_config=None,
+        ),
+        token,
+        Path(parent_heartbeat_value),
+    )
+    server.run()
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    if len(sys.argv) > 1 and sys.argv[1] == "--grpc-tools-protoc":
+        from grpc_tools.protoc import main as protoc_main  # type: ignore[import-untyped]
+
+        raise SystemExit(protoc_main([sys.argv[0], *sys.argv[2:]]))
     main()

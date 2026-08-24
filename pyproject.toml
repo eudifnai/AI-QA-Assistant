@@ -7,9 +7,15 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.14,<2",
     "fastapi>=0.115,<1",
+    "grpcio-tools>=1.75,<2",
+    "keyring>=25.7,<26",
+    "protobuf>=6.32,<7",
     "pydantic-settings>=2.7,<3",
+    "pypdf>=6.14,<7",
+    "python-docx>=1.2,<2",
     "sqlmodel>=0.0.22,<0.1",
     "uvicorn[standard]>=0.34,<1",
+    "websockets>=17,<18",
 ]
 
 [dependency-groups]
@@ -17,8 +23,10 @@ dev = [
     "httpx2>=2,<3",
     "mypy>=1.14,<2",
     "pip-audit>=2.8,<3",
+    "pyinstaller>=6.21,<7",
     "pytest>=9.0.3,<10",
     "ruff>=0.9,<1",
+    "types-protobuf>=6.32,<7",
 ]
 
 [tool.uv]
@@ -32,6 +40,7 @@ testpaths = ["backend/tests", "tests"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+extend-exclude = [".test-tmp-*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
