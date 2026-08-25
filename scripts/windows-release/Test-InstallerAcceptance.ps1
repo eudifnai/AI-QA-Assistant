@@ -149,6 +149,9 @@ try {
         -TemporaryDirectory $smokeTemporaryDirectory `
         -Identifier "fixed-evidence"
     Assert-True `
+        -Condition ($smokePaths.TemporaryRoot -eq [System.IO.Path]::GetFullPath($smokeTemporaryDirectory)) `
+        -Message "生命周期脚本应记录传给 Electron TEMP/TMP 的受控临时根。"
+    Assert-True `
         -Condition ($smokePaths.TemporaryPath -eq (Join-Path $smokeTemporaryDirectory "ai-qa-acceptance-fixed-evidence.json")) `
         -Message "应用只能接收系统临时目录中的绝对证据路径。"
     Assert-True `

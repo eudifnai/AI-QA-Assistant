@@ -318,6 +318,7 @@ function New-InstalledApplicationSmokePaths {
     [System.IO.Directory]::CreateDirectory($evidenceRoot) | Out-Null
     $fileName = "ai-qa-acceptance-$Identifier.json"
     [pscustomobject]@{
+        TemporaryRoot = $temporaryRoot
         TemporaryPath = Join-Path $temporaryRoot $fileName
         EvidencePath = Join-Path $evidenceRoot $fileName
     }
@@ -424,6 +425,8 @@ function Invoke-InstalledApplicationSmoke {
         try {
             $exitCode = Invoke-CheckedProcess -FilePath $InstalledApplication.ExecutablePath -Environment @{
                 AI_QA_ACCEPTANCE_SMOKE_PATH = $smokePaths.TemporaryPath
+                TEMP = $smokePaths.TemporaryRoot
+                TMP = $smokePaths.TemporaryRoot
             } -TimeoutSeconds $TimeoutSeconds -AllowNonZeroExit
         }
         catch {

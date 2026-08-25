@@ -84,7 +84,8 @@ pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 `
 验收模式启动失败时不会打开需要人工关闭的模态对话框，而会原子写入不含会话令牌的错误证据并以
 非零状态退出，生命周期脚本据此报告具体启动错误；就绪证据完成后会先停止 Sidecar，再强制结束专用
 验收进程，避免无交互 runner 被 Electron 退出钩子挂起。外部进程超过默认 180 秒仍会被终止并报告
-最后一个安全状态。
+最后一个安全状态。脚本还会把受控证据根显式注入子进程的 `TEMP/TMP`，确保 PowerShell/.NET 与
+Electron/Node 在干净 runner 上使用同一个临时目录边界。
 
 当前开发机已执行 `Validate`、package EXE 冒烟和当前用户 Setup 生命周期；最终证据状态为 `passed`，
 安装根、进程和卸载项已清理，319,488 字节用户数据库保留。GitHub Windows runner 已配置生命周期门禁，
