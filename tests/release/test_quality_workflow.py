@@ -17,6 +17,12 @@ def test_quality_workflow_supports_manual_clean_runner_dispatch() -> None:
     assert "-AllowSystemChanges" in workflow
 
 
+def test_windows_lifecycle_allows_slow_hosted_runner_installation() -> None:
+    workflow = _workflow_text()
+
+    assert workflow.count("-TimeoutSeconds 600") == 2
+
+
 def test_quality_workflow_keeps_release_security_gates() -> None:
     workflow = _workflow_text()
 

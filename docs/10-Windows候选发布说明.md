@@ -81,6 +81,8 @@ pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 `
 墓碑残留会被精确白名单取证并由测试脚本清理，任意未知残留都会失败。传入
 `-PreviousArtifactRoot <上一候选 out/make>` 时还会
 执行跨版本升级并确认数据库路径保持一致；未传入时升级阶段固定记录为 `skipped`。
+脚本本地默认的单进程等待上限为 180 秒；GitHub 托管 Windows runner 因首次安装与安全扫描较慢，
+生命周期及升级门禁显式使用 600 秒上限，超时后仍会终止进程并判定失败。
 
 当前开发机已执行 `Validate`、package EXE 冒烟和当前用户 Setup 生命周期；最终证据状态为 `passed`，
 安装根、进程和卸载项已清理，319,488 字节用户数据库保留。GitHub Windows runner 已配置生命周期门禁，

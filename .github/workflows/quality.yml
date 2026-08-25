@@ -145,6 +145,7 @@ jobs:
         run: >
           pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
           -Mode Lifecycle
+          -TimeoutSeconds 600
           -AllowSystemChanges
           -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance"
       - name: Exercise upgrade, first launch, and uninstall
@@ -153,6 +154,7 @@ jobs:
         run: >
           pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1
           -Mode Lifecycle
+          -TimeoutSeconds 600
           -PreviousArtifactRoot "$env:RUNNER_TEMP/ai-qa-previous-candidate"
           -AllowSystemChanges
           -EvidenceDirectory "$env:RUNNER_TEMP/ai-qa-installer-acceptance"

@@ -207,7 +207,9 @@ class GrpcToolsProtoCompiler:
                     capture_output=True,
                     timeout=self._timeout_seconds,
                     shell=False,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    creationflags=(
+                        getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+                    ),
                 )
             except subprocess.TimeoutExpired as exception:
                 raise ProtoCompilerError("PROTO_COMPILE_TIMEOUT", "Proto 编译超时。") from exception

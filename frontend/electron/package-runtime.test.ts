@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -26,6 +26,19 @@ import {
 const VERSION = "43.3.0";
 const PLATFORM = "win32";
 const ARCH = "x64";
+const FRONTEND_DIRECTORY = resolve("test-fixtures", "repo", "frontend");
+const PROJECT_DIRECTORY = resolve(FRONTEND_DIRECTORY, "..");
+const ELECTRON_ZIP_PATH = join(
+  resolve("test-fixtures", "cache", "release"),
+  electronArtifactFileName(VERSION, PLATFORM, ARCH),
+);
+const FORGE_PACKAGE_JSON_PATH = join(
+  PROJECT_DIRECTORY,
+  "node_modules",
+  "@electron-forge",
+  "cli",
+  "package.json",
+);
 
 function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
@@ -39,8 +52,13 @@ describe("Electron package runtime", () => {
   });
 
   it("resolves the platform-specific Sidecar executable", () => {
-    expect(sidecarExecutablePath("C:\\repo\\frontend", "win32")).toBe(
-      "C:\\repo\\frontend\\.sidecar-dist\\ai-qa-backend\\ai-qa-backend.exe",
+    expect(sidecarExecutablePath(FRONTEND_DIRECTORY, "win32")).toBe(
+      join(
+        FRONTEND_DIRECTORY,
+        ".sidecar-dist",
+        "ai-qa-backend",
+        "ai-qa-backend.exe",
+      ),
     );
   });
 
@@ -134,41 +152,41 @@ describe("Electron package runtime", () => {
 
   it("passes only the verified ZIP directory to Electron Forge", () => {
     const spec = buildForgeLaunchSpec(
-      "C:\\repo\\frontend",
-      "C:\\cache\\release\\electron-v43.3.0-win32-x64.zip",
-      "C:\\repo\\node_modules\\@electron-forge\\cli\\package.json",
+      FRONTEND_DIRECTORY,
+      ELECTRON_ZIP_PATH,
+      FORGE_PACKAGE_JSON_PATH,
       { CI: "1" },
     );
 
     expect(spec).toEqual({
       executable: process.execPath,
       args: [
-        "C:\\repo\\node_modules\\@electron-forge\\cli\\dist\\electron-forge.js",
+        join(dirname(FORGE_PACKAGE_JSON_PATH), "dist", "electron-forge.js"),
         "package",
       ],
-      cwd: "C:\\repo\\frontend",
+      cwd: FRONTEND_DIRECTORY,
       env: {
         CI: "1",
-        AI_QA_ELECTRON_ZIP_DIR: "C:\\cache\\release",
+        AI_QA_ELECTRON_ZIP_DIR: dirname(ELECTRON_ZIP_PATH),
       },
     });
   });
 
   it("builds a Forge make launch from the verified Electron ZIP", () => {
     const spec = buildForgeLaunchSpec(
-      "C:\\repo\\frontend",
-      "C:\\cache\\release\\electron-v43.3.0-win32-x64.zip",
-      "C:\\repo\\node_modules\\@electron-forge\\cli\\package.json",
+      FRONTEND_DIRECTORY,
+      ELECTRON_ZIP_PATH,
+      FORGE_PACKAGE_JSON_PATH,
       { CI: "1" },
       "make",
     );
 
     expect(spec.args.at(-1)).toBe("make");
-    expect(spec.env.AI_QA_ELECTRON_ZIP_DIR).toBe("C:\\cache\\release");
+    expect(spec.env.AI_QA_ELECTRON_ZIP_DIR).toBe(dirname(ELECTRON_ZIP_PATH));
   });
 
   it("builds an SBOM process without forwarding signing secrets", () => {
-    const spec = buildReleaseSbomLaunchSpec("C:\\repo\\frontend", {
+    const spec = buildReleaseSbomLaunchSpec(FRONTEND_DIRECTORY, {
       CI: "1",
       AI_QA_WINDOWS_SIGN_CERTIFICATE_PASSWORD: "ai-secret",
       WINDOWS_CERTIFICATE_PASSWORD: "forge-secret",
@@ -179,15 +197,15 @@ describe("Electron package runtime", () => {
       args: [
         "run",
         "--project",
-        "C:\\repo",
+        PROJECT_DIRECTORY,
         "python",
-        "C:\\repo\\scripts\\release\\generate_sbom.py",
+        join(PROJECT_DIRECTORY, "scripts", "release", "generate_sbom.py"),
         "--project-root",
-        "C:\\repo",
+        PROJECT_DIRECTORY,
         "--output",
-        "C:\\repo\\frontend\\out\\make\\ai-qa-assistant.cdx.json",
+        join(FRONTEND_DIRECTORY, "out", "make", "ai-qa-assistant.cdx.json"),
       ],
-      cwd: "C:\\repo",
+      cwd: PROJECT_DIRECTORY,
       env: { CI: "1" },
     });
   });
