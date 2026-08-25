@@ -126,6 +126,17 @@ try {
         database_bytes = 6
     }
     Assert-InstalledApplicationSmokeEvidence -Smoke $smoke -ExpectedVersion "0.1.0"
+    $errorSmoke = [pscustomobject]@{
+        status = "error"
+        message = "本地后端在完成启动前退出。"
+    }
+    Assert-Throws -Action {
+        Assert-InstalledApplicationSmokeProcessResult -Smoke $errorSmoke -ExitCode 1 -ExpectedVersion "0.1.0"
+    } -ExpectedMessage "安装后应用启动失败：本地后端在完成启动前退出。"
+    $progressSmoke = [pscustomobject]@{ status = "electron_ready" }
+    Assert-Throws -Action {
+        Assert-InstalledApplicationSmokeProcessResult -Smoke $progressSmoke -ExitCode 2 -ExpectedVersion "0.1.0"
+    } -ExpectedMessage "安装后应用异常退出，退出码 2"
     $smoke.api_host = "0.0.0.0"
     Assert-Throws -Action {
         Assert-InstalledApplicationSmokeEvidence -Smoke $smoke -ExpectedVersion "0.1.0"

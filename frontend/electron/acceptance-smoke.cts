@@ -59,6 +59,28 @@ export function writeAcceptanceSmokeProgress(
   }
 }
 
+export async function writeAcceptanceSmokeFailure(
+  evidencePath: string,
+  message: string,
+): Promise<void> {
+  const temporaryPath = `${evidencePath}.tmp-${process.pid}-${randomUUID()}`;
+  try {
+    await writeFile(
+      temporaryPath,
+      `${JSON.stringify({
+        status: "error",
+        message,
+        recorded_at: new Date().toISOString(),
+      })}\n`,
+      { encoding: "utf8", flag: "wx" },
+    );
+    await rename(temporaryPath, evidencePath);
+  } catch (error: unknown) {
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
 export function resolveAcceptanceSmokePath(
   argv: string[],
   temporaryDirectory: string,

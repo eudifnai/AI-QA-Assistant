@@ -16,6 +16,7 @@ import {
 
 import {
   resolveAcceptanceSmokePath,
+  writeAcceptanceSmokeFailure,
   writeAcceptanceSmokeProgress,
   writeAcceptanceSmokeEvidence,
 } from "./acceptance-smoke.cjs";
@@ -283,8 +284,20 @@ if (!SQUIRREL_STARTUP) {
       writeAcceptanceSmokeProgress(ACCEPTANCE_SMOKE_PATH, "electron_ready");
     }
     await startApplication();
-  }).catch((error: unknown) => {
+  }).catch(async (error: unknown) => {
     const message = error instanceof Error ? error.message : "桌面应用启动失败。";
+    if (ACCEPTANCE_SMOKE_PATH !== null) {
+      backendRuntime?.stop();
+      backendRuntime = null;
+      try {
+        await writeAcceptanceSmokeFailure(ACCEPTANCE_SMOKE_PATH, message);
+      } catch (evidenceError: unknown) {
+        console.error("无法写入安装验收失败证据。", evidenceError);
+      }
+      console.error(`AI QA Assistant 启动失败：${message}`);
+      app.exit(1);
+      return;
+    }
     dialog.showErrorBox("AI QA Assistant 启动失败", message);
     app.quit();
   });

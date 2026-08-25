@@ -421,14 +421,14 @@ function Invoke-InstalledApplicationSmoke {
 
     $smokePaths = New-InstalledApplicationSmokePaths -EvidenceDirectory $EvidenceDirectory
     try {
-        Invoke-CheckedProcess -FilePath $InstalledApplication.ExecutablePath -Environment @{
+        $exitCode = Invoke-CheckedProcess -FilePath $InstalledApplication.ExecutablePath -Environment @{
             AI_QA_ACCEPTANCE_SMOKE_PATH = $smokePaths.TemporaryPath
-        } -TimeoutSeconds $TimeoutSeconds | Out-Null
+        } -TimeoutSeconds $TimeoutSeconds -AllowNonZeroExit
         if (-not (Test-Path -LiteralPath $smokePaths.TemporaryPath -PathType Leaf)) {
             throw "安装后应用未生成就绪证据。"
         }
         $smoke = Get-Content -LiteralPath $smokePaths.TemporaryPath -Raw | ConvertFrom-Json
-        Assert-InstalledApplicationSmokeEvidence -Smoke $smoke -ExpectedVersion $ExpectedVersion
+        Assert-InstalledApplicationSmokeProcessResult -Smoke $smoke -ExitCode $exitCode -ExpectedVersion $ExpectedVersion
         return $smoke
     }
     finally {
@@ -439,6 +439,30 @@ function Invoke-InstalledApplicationSmoke {
             Move-Item -LiteralPath $smokePaths.TemporaryPath -Destination $smokePaths.EvidencePath -Force
         }
     }
+}
+
+function Assert-InstalledApplicationSmokeProcessResult {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Smoke,
+        [Parameter(Mandatory)]
+        [int]$ExitCode,
+        [Parameter(Mandatory)]
+        [string]$ExpectedVersion
+    )
+
+    if ($Smoke.status -eq "error") {
+        $message = [string]$Smoke.message
+        if ([string]::IsNullOrWhiteSpace($message)) {
+            $message = "未知启动错误。"
+        }
+        throw "安装后应用启动失败：$message"
+    }
+    if ($ExitCode -ne 0) {
+        throw "安装后应用异常退出，退出码 $ExitCode。"
+    }
+    Assert-InstalledApplicationSmokeEvidence -Smoke $Smoke -ExpectedVersion $ExpectedVersion
 }
 
 function Assert-InstalledApplicationSmokeEvidence {
@@ -631,4 +655,4 @@ function Invoke-InstallerAcceptance {
     }
 }
 
-Export-ModuleMember -Function Get-VerifiedReleaseArtifacts, Invoke-InstallerAcceptance, Assert-InstalledApplicationSmokeEvidence, New-InstalledApplicationSmokePaths, Get-SquirrelUninstallState
+Export-ModuleMember -Function Get-VerifiedReleaseArtifacts, Invoke-InstallerAcceptance, Assert-InstalledApplicationSmokeProcessResult, Assert-InstalledApplicationSmokeEvidence, New-InstalledApplicationSmokePaths, Get-SquirrelUninstallState

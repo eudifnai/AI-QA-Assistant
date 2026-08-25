@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveAcceptanceSmokePath,
+  writeAcceptanceSmokeFailure,
   writeAcceptanceSmokeProgress,
   writeAcceptanceSmokeEvidence,
 } from "./acceptance-smoke.cts";
@@ -116,6 +117,26 @@ describe("Electron installed-app acceptance smoke", () => {
 
       expect(JSON.parse(readFileSync(evidencePath, "utf8"))).toMatchObject({
         status: "starting",
+      });
+      expect(readFileSync(evidencePath, "utf8")).not.toContain("token");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("writes an atomic startup failure for non-interactive acceptance", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ai-qa-acceptance-smoke-test-"));
+    try {
+      const evidencePath = join(root, "ai-qa-acceptance-error.json");
+
+      await writeAcceptanceSmokeFailure(
+        evidencePath,
+        "本地后端在完成启动前退出。",
+      );
+
+      expect(JSON.parse(readFileSync(evidencePath, "utf8"))).toMatchObject({
+        status: "error",
+        message: "本地后端在完成启动前退出。",
       });
       expect(readFileSync(evidencePath, "utf8")).not.toContain("token");
     } finally {
