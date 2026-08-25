@@ -7,6 +7,7 @@ import { join, win32 } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  exitAcceptanceSmokeProcess,
   resolveAcceptanceSmokePath,
   writeAcceptanceSmokeFailure,
   writeAcceptanceSmokeProgress,
@@ -14,6 +15,18 @@ import {
 } from "./acceptance-smoke.cts";
 
 describe("Electron installed-app acceptance smoke", () => {
+  it("stops the Sidecar before forcing the acceptance process to exit", () => {
+    const events: string[] = [];
+
+    exitAcceptanceSmokeProcess(
+      () => events.push("backend_stopped"),
+      (exitCode) => events.push(`app_exit_${exitCode}`),
+      0,
+    );
+
+    expect(events).toEqual(["backend_stopped", "app_exit_0"]);
+  });
+
   it("accepts one JSON evidence path confined to the Windows temp directory", () => {
     expect(
       resolveAcceptanceSmokePath(

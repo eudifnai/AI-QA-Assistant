@@ -16,6 +16,15 @@ export interface AcceptanceSmokeEvidenceOptions {
   apiBaseUrl: string;
 }
 
+export function exitAcceptanceSmokeProcess(
+  stopBackend: () => void,
+  exitApplication: (exitCode: number) => void,
+  exitCode: number,
+): void {
+  stopBackend();
+  exitApplication(exitCode);
+}
+
 function resolveAcceptanceApiHost(apiBaseUrl: string): string {
   let url: URL;
   try {

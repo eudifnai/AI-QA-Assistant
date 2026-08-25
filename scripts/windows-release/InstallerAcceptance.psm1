@@ -421,9 +421,35 @@ function Invoke-InstalledApplicationSmoke {
 
     $smokePaths = New-InstalledApplicationSmokePaths -EvidenceDirectory $EvidenceDirectory
     try {
-        $exitCode = Invoke-CheckedProcess -FilePath $InstalledApplication.ExecutablePath -Environment @{
-            AI_QA_ACCEPTANCE_SMOKE_PATH = $smokePaths.TemporaryPath
-        } -TimeoutSeconds $TimeoutSeconds -AllowNonZeroExit
+        try {
+            $exitCode = Invoke-CheckedProcess -FilePath $InstalledApplication.ExecutablePath -Environment @{
+                AI_QA_ACCEPTANCE_SMOKE_PATH = $smokePaths.TemporaryPath
+            } -TimeoutSeconds $TimeoutSeconds -AllowNonZeroExit
+        }
+        catch {
+            $processMessage = $_.Exception.Message
+            if (Test-Path -LiteralPath $smokePaths.TemporaryPath -PathType Leaf) {
+                try {
+                    $partialSmoke = Get-Content -LiteralPath $smokePaths.TemporaryPath -Raw | ConvertFrom-Json
+                    if ($partialSmoke.status -eq "error") {
+                        Assert-InstalledApplicationSmokeProcessResult -Smoke $partialSmoke -ExitCode 1 -ExpectedVersion $ExpectedVersion
+                    }
+                    $lastStatus = if ([string]::IsNullOrWhiteSpace([string]$partialSmoke.status)) {
+                        "unknown"
+                    }
+                    else {
+                        [string]$partialSmoke.status
+                    }
+                    throw "安装后应用未完成就绪，最后状态：$lastStatus。$processMessage"
+                }
+                catch {
+                    if ($_.Exception.Message -like "安装后应用*") {
+                        throw
+                    }
+                }
+            }
+            throw
+        }
         if (-not (Test-Path -LiteralPath $smokePaths.TemporaryPath -PathType Leaf)) {
             throw "安装后应用未生成就绪证据。"
         }
