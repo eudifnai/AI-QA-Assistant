@@ -168,7 +168,9 @@ try {
         ".dead",
         "Update.exe",
         "app-0.1.0/squirrel.exe",
-        "app-0.1.0/v8_context_snapshot.bin"
+        "app-0.1.0/v8_context_snapshot.bin",
+        "app-0.1.0/vk_swiftshader_icd.json",
+        "app-0.1.0/vk_swiftshader.dll"
     )) {
         $path = Join-Path $installedRoot $relativePath
         [System.IO.File]::WriteAllText($path, "residue")
@@ -181,7 +183,9 @@ try {
     }
     $uninstallState = Get-SquirrelUninstallState -InstalledApplication $installedApplication
     Assert-True -Condition (-not $uninstallState.Removed) -Message "应识别仍存在的 Squirrel 墓碑目录。"
-    Assert-True -Condition ($uninstallState.ResiduePaths.Count -eq 4) -Message "应记录四个允许的 Squirrel 墓碑文件。"
+    Assert-True `
+        -Condition ($uninstallState.ResiduePaths.Count -eq 6) `
+        -Message "应记录六个允许的 Electron/Squirrel 墓碑文件。"
     [System.IO.File]::WriteAllText((Join-Path $installedVersion "user-content.txt"), "unexpected")
     Assert-Throws -Action {
         Get-SquirrelUninstallState -InstalledApplication $installedApplication | Out-Null

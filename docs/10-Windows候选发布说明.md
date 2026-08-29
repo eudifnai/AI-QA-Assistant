@@ -79,8 +79,8 @@ pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 `
 
 该模式通过受限的专用环境变量启动已安装 EXE。应用只有在 Sidecar 安全握手、Alembic 迁移、数据库创建和 renderer
 加载均完成后，才向系统临时目录原子写入不含令牌和端口、且固定包含 `api_host=127.0.0.1` 的 `ready`
-证据；随后脚本调用 Squirrel 卸载并确认主程序与卸载项消失、用户数据库按当前策略保留。Squirrel 固定
-墓碑残留会被精确白名单取证并由测试脚本清理，任意未知残留都会失败。传入
+证据；随后脚本调用 Squirrel 卸载并确认主程序与卸载项消失、用户数据库按当前策略保留。
+Electron/Squirrel 固定墓碑残留会被精确白名单取证并由测试脚本清理，任意未知残留都会失败。传入
 `-PreviousArtifactRoot <上一候选 out/make>` 时还会
 执行跨版本升级并确认数据库路径保持一致；未传入时升级阶段固定记录为 `skipped`。
 验收模式启动失败时不会打开需要人工关闭的模态对话框，而会原子写入不含会话令牌的错误证据并以

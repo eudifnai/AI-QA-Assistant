@@ -46,6 +46,8 @@
 - 开发机当前用户已完成未签名 Setup 的安装、首次启动和卸载回归；卸载保留用户数据库。
 - 提交 `f6c3f02` 的 GitHub hosted Windows runner 已完成未签名候选的 make、制品校验、真实安装、
   Sidecar/Alembic/renderer 首启、卸载和用户数据库保留，并归档候选制品。
+- 卸载门禁精确识别 Electron 可能被短暂占用的 SwiftShader DLL 与清单文件，取证后只清理固定版本目录，
+  其他未知文件或目录仍会阻塞候选发布。
 
 ### 已知限制
 

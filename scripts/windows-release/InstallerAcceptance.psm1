@@ -357,7 +357,9 @@ function Get-SquirrelUninstallState {
         ".dead",
         "Update.exe",
         "$versionDirectoryName/squirrel.exe",
-        "$versionDirectoryName/v8_context_snapshot.bin"
+        "$versionDirectoryName/v8_context_snapshot.bin",
+        "$versionDirectoryName/vk_swiftshader_icd.json",
+        "$versionDirectoryName/vk_swiftshader.dll"
     )) {
         $allowedFiles.Add($relativePath) | Out-Null
     }

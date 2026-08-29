@@ -198,8 +198,8 @@ Windows CI 还会在一次性 runner 中执行安装、后端迁移与首次启�
 
 当前 `0.1.0` 候选已在开发机当前用户配置文件完成一次真实 Setup 生命周期：安装、Sidecar/Alembic/
 renderer 就绪、`api_host=127.0.0.1`、卸载和用户数据库保留均通过。Squirrel 卸载可能留下固定墓碑文件；
-门禁只允许 `.dead`、Updater 本体和对应版本目录内的 Squirrel 运行时文件，记录数量后清理测试安装根，
-任何未知残留都失败。提交 `f6c3f02` 的 GitHub hosted Windows runner 也已完成相同安装生命周期并
+门禁只允许 `.dead`、Updater 本体和对应版本目录内的 Electron/Squirrel 固定运行时文件；记录数量后
+清理测试安装根，任何未知残留都失败。提交 `f6c3f02` 的 GitHub hosted Windows runner 也已完成相同安装生命周期并
 归档候选；该结论仍不覆盖独立 VM 的 SmartScreen/重复安装、跨版本升级或正式签名验收。
 
 安装候选前的哈希校验、首次使用闭环、HTTP/WebSocket/Protobuf 示例、诊断、备份和卸载数据范围见
