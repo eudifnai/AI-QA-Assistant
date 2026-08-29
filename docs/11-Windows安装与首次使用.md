@@ -12,7 +12,8 @@
 
 建议环境：
 
-- 目标环境为 Windows 10/11 x64；干净 VM 尚未验证，当前候选未生成 ARM64、MSI 或 MSIX。
+- 目标环境为 Windows 10/11 x64；GitHub hosted Windows runner 的安装生命周期已通过，独立 VM 的
+  SmartScreen 与重复安装尚未验证；当前候选未生成 ARM64、MSI 或 MSIX。
 - 当前用户可写的应用数据目录和至少 1 GiB 可用磁盘空间。
 - 如使用本地分析，先安装并启动 Ollama；如使用云端分析，准备受信任的 OpenAI-compatible HTTPS
   endpoint 和 API Key。

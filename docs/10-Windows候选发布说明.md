@@ -4,7 +4,8 @@
 
 当前版本为 `0.1.0` Windows x64 内部候选。它已包含 Electron 应用、独立 Python Sidecar、Alembic
 迁移和冻结 Protobuf 编译器，并在开发机当前用户配置文件完成真实安装、首次启动和卸载回归；但尚未
-进行 Authenticode 签名，也未在干净虚拟机完成安装或跨版本升级验收。
+进行 Authenticode 签名。GitHub hosted Windows runner 已完成安装生命周期；独立 VM 的 SmartScreen、
+重复安装和跨版本升级仍未验收。
 不得将本候选标记为正式稳定版或面向不受控用户公开分发。
 
 ## 2. 生成制品
@@ -48,11 +49,12 @@ SHA-256 只能发现传输或存储篡改，不能证明发布者身份。当前
 - SHA-256 清单覆盖三个 Squirrel 制品、SBOM 和发布元数据并重新计算一致。
 - full.nupkg 内含 Electron resources 下的完整 Python Sidecar。
 - package 候选可启动，并在重定向 Electron `userData` 中自动创建和迁移 SQLite 数据库。
-- package 候选通过受限环境变量生成最终 `ready` 证据，证据不包含会话令牌，应用随后正常退出。
+- package 候选通过受限环境变量生成最终 `ready` 证据，证据不包含会话令牌；专用验收进程随后停止
+  Sidecar 并强制退出。
 - Setup.exe 在开发机当前用户完成安装、Sidecar/Alembic/renderer 就绪、回环 API 取证和卸载；
   卸载后用户数据库保留，安装根由门禁清理完成。
 
-当前仍未验证干净 VM、SmartScreen、重复安装、跨版本升级或系统凭据库保留。
+当前仍未验证独立 VM 的 SmartScreen、重复安装、跨版本升级或系统凭据库保留。
 
 ## 5. 自动化安装验收
 
@@ -89,8 +91,9 @@ Electron/Node 在干净 runner 上使用同一个临时目录边界。
 
 当前开发机已执行 `Validate`、package EXE 冒烟和当前用户 Setup 生命周期；最终证据状态为 `passed`，
 安装根、进程和卸载项已清理，319,488 字节用户数据库保留。GitHub Windows runner 已配置生命周期门禁，
-但在实际干净 runner 工作流成功完成前，不得勾选
-“干净环境启动成功”。`0.1.0` 是首个公开版本，没有上一稳定安装包，因此本次跨版本阶段记为
+`f6c3f02` 对应的 [Quality run 32873435673](https://github.com/eudifnai/AI-QA-Assistant/actions/runs/32873435673)
+已通过 make、Validate、安装、首次启动、卸载和候选归档，可勾选“一次性 hosted runner 干净环境启动
+成功”。`0.1.0` 是首个公开版本，没有上一稳定安装包，因此本次跨版本阶段记为
 `skipped / not applicable`；不得声称升级已经验证，也不得用同版本或人工伪造制品替代。正式发布后
 必须归档可回滚的 `0.1.0` 制品，作为下一版本的强制升级基线。验收 JSON 默认只存在于临时 runner，
 不上传包含本机路径和制品哈希的文件。
@@ -103,6 +106,7 @@ Electron/Node 在干净 runner 上使用同一个临时目录边界。
 仅限 Setup、full.nupkg、RELEASES、SBOM、脱敏发布元数据和 SHA-256 清单，不包含生命周期 JSON、
 PFX、口令或 runner 本机路径。下一版本手动运行时填写该正整数 `previous_run_id`，工作流会从当前
 仓库下载对应候选，完成哈希校验后传入 `-PreviousArtifactRoot` 执行真实升级生命周期。
+本次归档名为 `windows-release-candidate-32873435673`，截至复核时未过期，计划保留至 2026-11-23。
 
 ## 6. 受控 PFX 签名
 

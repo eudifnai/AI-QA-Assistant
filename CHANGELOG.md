@@ -8,7 +8,7 @@
 ### 待完成
 
 - 使用受控正式证书完成 Authenticode 签名与时间戳验证。
-- 在实际 GitHub Windows runner 或干净虚拟机完成安装生命周期。
+- 在独立 Windows VM 完成 SmartScreen、重复安装和系统凭据卸载保留检查。
 - 首个公开版本发布后归档可回滚制品，并把它作为下一版本跨版本升级、数据库迁移和回滚验收基线。
 
 ## [0.1.0] - 2026-08-24（内部候选）
@@ -44,11 +44,13 @@
 - 成功的非 PR Windows 候选会把 Setup、NUPKG、RELEASES、SBOM、发布元数据和哈希清单归档到
   GitHub Actions 90 天；后续版本可按正整数 run ID 下载上一候选并执行真实升级生命周期。
 - 开发机当前用户已完成未签名 Setup 的安装、首次启动和卸载回归；卸载保留用户数据库。
+- 提交 `f6c3f02` 的 GitHub hosted Windows runner 已完成未签名候选的 make、制品校验、真实安装、
+  Sidecar/Alembic/renderer 首启、卸载和用户数据库保留，并归档候选制品。
 
 ### 已知限制
 
 - 当前 Setup 未签名，只能作为受控内部候选；Windows 可能显示未知发布者或 SmartScreen 提示。
-- 尚未完成真实干净 runner、跨版本升级、正式证书和系统凭据卸载保留验证。
+- 尚未完成正式证书签名、跨版本升级、SmartScreen、重复安装和系统凭据卸载保留验证。
 - 当前不支持 OCR、原生/流式 gRPC、本地多文件 Proto import、批量执行、数据库恢复或自动备份。
 - 前端主包仍有大于 500 kB 的构建警告。
 - Electron Forge 的 `extract-zip 2.0.1` 传递依赖仍有一项已记录 high 风险；当前仅在校验官方
