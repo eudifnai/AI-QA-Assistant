@@ -88,6 +88,8 @@ Electron/Squirrel 固定墓碑残留会被精确白名单取证并由测试脚�
 验收进程，避免无交互 runner 被 Electron 退出钩子挂起。外部进程超过默认 180 秒仍会被终止并报告
 最后一个安全状态。脚本还会把受控证据根显式注入子进程的 `TEMP/TMP`，确保 PowerShell/.NET 与
 Electron/Node 在干净 runner 上使用同一个临时目录边界。
+打包态 Python Sidecar 的内部冷启动等待上限为 45 秒，以容纳干净环境首次扫描和解压抖动；达到上限仍会
+写入中文错误证据并以非零状态退出，不会无限等待。
 
 当前开发机已执行 `Validate`、package EXE 冒烟和当前用户 Setup 生命周期；最终证据状态为 `passed`，
 安装根、进程和卸载项已清理，319,488 字节用户数据库保留。GitHub Windows runner 已配置生命周期门禁，

@@ -10,7 +10,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 
-const BACKEND_STARTUP_TIMEOUT_MS = 15_000;
+const DEVELOPMENT_BACKEND_STARTUP_TIMEOUT_MS = 15_000;
+const PACKAGED_BACKEND_STARTUP_TIMEOUT_MS = 45_000;
 const MINIMUM_SESSION_TOKEN_LENGTH = 43;
 
 export interface BackendConnection {
@@ -52,6 +53,18 @@ export type BackendLaunchOptions =
       resourcesPath: string;
       userDataPath: string;
     });
+
+export function resolveBackendStartupTimeoutMs(
+  packaged: boolean,
+  overrideMs?: number,
+): number {
+  return (
+    overrideMs ??
+    (packaged
+      ? PACKAGED_BACKEND_STARTUP_TIMEOUT_MS
+      : DEVELOPMENT_BACKEND_STARTUP_TIMEOUT_MS)
+  );
+}
 
 export function parseBackendStartupMessage(line: string): BackendConnection {
   let payload: BackendStartupPayload;
@@ -158,8 +171,12 @@ function stopChild(child: ChildProcess): void {
 
 export async function startBackend(
   options: BackendLaunchOptions,
-  timeoutMs: number = BACKEND_STARTUP_TIMEOUT_MS,
+  timeoutMs?: number,
 ): Promise<BackendRuntime> {
+  const startupTimeoutMs = resolveBackendStartupTimeoutMs(
+    options.packaged,
+    timeoutMs,
+  );
   const launch = buildBackendLaunchSpec(options);
   const heartbeatPath = launch.environment.AI_QA_PARENT_HEARTBEAT_PATH;
   if (heartbeatPath === undefined) {
@@ -242,7 +259,7 @@ export async function startBackend(
     const onExit = (): void => fail("本地后端在完成启动前退出。");
     const timeout = setTimeout(
       () => fail("等待本地后端启动超时。"),
-      timeoutMs,
+      startupTimeoutMs,
     );
 
     child.once("error", onError);

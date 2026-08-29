@@ -10,9 +10,16 @@ import {
   buildBackendLaunchSpec,
   findWorkspaceRoot,
   parseBackendStartupMessage,
+  resolveBackendStartupTimeoutMs,
 } from "./backend-runtime.cts";
 
 describe("Electron backend runtime", () => {
+  it("allows a bounded longer cold start for packaged sidecars", () => {
+    expect(resolveBackendStartupTimeoutMs(false)).toBe(15_000);
+    expect(resolveBackendStartupTimeoutMs(true)).toBe(45_000);
+    expect(resolveBackendStartupTimeoutMs(true, 2_000)).toBe(2_000);
+  });
+
   it("parses a valid loopback startup handshake", () => {
     const token = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
 
