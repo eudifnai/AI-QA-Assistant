@@ -12,8 +12,8 @@
 
 建议环境：
 
-- 目标环境为 Windows 10/11 x64；GitHub hosted Windows runner 的安装生命周期已通过，独立 VM 的
-  SmartScreen 与重复安装尚未验证；当前候选未生成 ARM64、MSI 或 MSIX。
+- 目标环境为 Windows 10/11 x64；GitHub hosted Windows runner 的安装生命周期已通过，同版本重复安装
+  已纳入自动验收；正式签名候选的独立 VM SmartScreen 尚未验证，当前候选未生成 ARM64、MSI 或 MSIX。
 - 当前用户可写的应用数据目录和至少 1 GiB 可用磁盘空间。
 - 如使用本地分析，先安装并启动 Ollama；如使用云端分析，准备受信任的 OpenAI-compatible HTTPS
   endpoint 和 API Key。
@@ -197,8 +197,9 @@ message EchoResponse { bool ok = 1; string message = 2; }
 4. 退出应用，再通过 Windows“已安装的应用”卸载。
 
 当前卸载策略会移除应用文件和卸载项，但保留 `%APPDATA%\AI QA Assistant` 下的业务数据库和备份。
-工作空间原文件始终由用户管理。安装生命周期门禁尚未证明所有 Windows 凭据在卸载后的系统级保留或删除
-行为，因此需要在卸载前从应用显式清除不应保留的凭据。
+工作空间原文件始终由用户管理。安装生命周期会写入唯一 Windows keyring 探针，确认卸载不会删除该
+系统凭据并在取证后主动清理；这证明安装器不会全局清理 Windows 凭据。应用目前也没有卸载时自动删除
+凭据的路径，因此仍需在卸载前从应用显式清除不希望保留的模型 API Key 和安全变量。
 
 ## 9. 常见问题与诊断
 

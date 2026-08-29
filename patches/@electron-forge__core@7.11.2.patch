@@ -1,0 +1,42 @@
+diff --git a/dist/api/package.js b/dist/api/package.js
+--- a/dist/api/package.js
++++ b/dist/api/package.js
+@@ -49,16 +49,15 @@
+ function sequentialHooks(hooks) {
+     return [
+-        hidePromiseFromPromisify(async (buildPath, electronVersion, platform, arch, done) => {
++        async ({ buildPath, electronVersion, platform, arch }) => {
+             for (const hook of hooks) {
+                 try {
+                     await (0, node_util_1.promisify)(hook)(buildPath, electronVersion, platform, arch);
+                 }
+                 catch (err) {
+                     d('hook failed:', hook.toString(), err);
+-                    return done(err);
++                    throw err;
+                 }
+             }
+-            done();
+-        }),
++        },
+     ];
+ }
+@@ -65,15 +64,14 @@
+ function sequentialFinalizePackageTargetsHooks(hooks) {
+     return [
+-        hidePromiseFromPromisify(async (targets, done) => {
++        async (targets) => {
+             for (const hook of hooks) {
+                 try {
+                     await (0, node_util_1.promisify)(hook)(targets);
+                 }
+                 catch (err) {
+-                    return done(err);
++                    throw err;
+                 }
+             }
+-            done();
+-        }),
++        },
+     ];
+ }

@@ -2,6 +2,32 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$script:RepositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+$script:CredentialProbeScript = @'
+import os
+
+import keyring
+
+action = os.environ["AI_QA_ACCEPTANCE_CREDENTIAL_ACTION"]
+service = os.environ["AI_QA_ACCEPTANCE_CREDENTIAL_SERVICE"]
+account = os.environ["AI_QA_ACCEPTANCE_CREDENTIAL_ACCOUNT"]
+
+if action == "set":
+    keyring.set_password(
+        service,
+        account,
+        os.environ["AI_QA_ACCEPTANCE_CREDENTIAL_SECRET"],
+    )
+elif action == "verify":
+    actual = keyring.get_password(service, account)
+    expected = os.environ["AI_QA_ACCEPTANCE_CREDENTIAL_SECRET"]
+    raise SystemExit(0 if actual == expected else 1)
+elif action == "delete":
+    if keyring.get_password(service, account) is not None:
+        keyring.delete_password(service, account)
+else:
+    raise ValueError("unsupported credential probe action")
+'@
 
 function Get-VerifiedReleaseArtifacts {
     [CmdletBinding()]
@@ -245,6 +271,48 @@ function Invoke-CheckedProcess {
     finally {
         $process.Dispose()
     }
+}
+
+function Invoke-WindowsCredentialProbe {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet("set", "verify", "delete")]
+        [string]$Action,
+        [Parameter(Mandatory)]
+        [string]$Service,
+        [Parameter(Mandatory)]
+        [string]$Account,
+        [Parameter()]
+        [string]$Secret,
+        [Parameter()]
+        [ValidateRange(1, 600)]
+        [int]$TimeoutSeconds = 60
+    )
+
+    if (-not $IsWindows) {
+        throw "系统凭据保留验收仅支持 Windows。"
+    }
+    if ($Action -in @("set", "verify") -and [string]::IsNullOrWhiteSpace($Secret)) {
+        throw "系统凭据保留验收缺少临时探针值。"
+    }
+    $pythonPath = Join-Path $script:RepositoryRoot ".venv/Scripts/python.exe"
+    if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+        throw "系统凭据保留验收需要项目 Python 虚拟环境，请先运行 uv sync。"
+    }
+    $environment = @{
+        AI_QA_ACCEPTANCE_CREDENTIAL_ACTION = $Action
+        AI_QA_ACCEPTANCE_CREDENTIAL_SERVICE = $Service
+        AI_QA_ACCEPTANCE_CREDENTIAL_ACCOUNT = $Account
+    }
+    if ($Action -in @("set", "verify")) {
+        $environment.AI_QA_ACCEPTANCE_CREDENTIAL_SECRET = $Secret
+    }
+    Invoke-CheckedProcess `
+        -FilePath $pythonPath `
+        -Arguments @("-c", $script:CredentialProbeScript) `
+        -Environment $environment `
+        -TimeoutSeconds $TimeoutSeconds | Out-Null
 }
 
 function Wait-ForCondition {
@@ -583,8 +651,11 @@ function Invoke-InstallerAcceptance {
         authenticode = $null
         stages = $stages
         user_data_retained_after_uninstall = $null
+        system_credential_retained_after_uninstall = $null
     }
     $installed = $null
+    $credentialProbe = $null
+    $credentialCleanupError = $null
 
     try {
         $stages.Add([pscustomobject]@{ name = "artifact_validation"; status = "passed" })
@@ -631,6 +702,29 @@ function Invoke-InstallerAcceptance {
             $stages.Add([pscustomobject]@{ name = "upgrade"; status = "skipped"; reason = "未提供上一候选制品目录。" })
         }
 
+        Invoke-CheckedProcess -FilePath $currentRelease.SetupPath -Arguments @("--silent") -TimeoutSeconds $TimeoutSeconds | Out-Null
+        $installed = Get-InstalledApplication -LocalAppDataPath $localAppDataPath -ExpectedVersion $currentRelease.Version -TimeoutSeconds $TimeoutSeconds
+        $repeatSmoke = Invoke-InstalledApplicationSmoke -InstalledApplication $installed -ExpectedVersion $currentRelease.Version -EvidenceDirectory $EvidenceDirectory -TimeoutSeconds $TimeoutSeconds
+        if ($repeatSmoke.database_path -ne $smoke.database_path) {
+            throw "重复安装后用户数据库路径发生变化。"
+        }
+        $smoke = $repeatSmoke
+        $stages.Add([pscustomobject]@{
+            name = "repeat_install"
+            version = $currentRelease.Version
+            status = "passed"
+            database_path = $smoke.database_path
+        })
+
+        $credentialProbe = [pscustomobject]@{
+            Service = "AI-QA-Assistant-InstallerAcceptance-$([guid]::NewGuid().ToString('N'))"
+            Account = "installer-acceptance"
+            Secret = [guid]::NewGuid().ToString("N")
+        }
+        Invoke-WindowsCredentialProbe -Action set -Service $credentialProbe.Service -Account $credentialProbe.Account -Secret $credentialProbe.Secret -TimeoutSeconds $TimeoutSeconds
+        Invoke-WindowsCredentialProbe -Action verify -Service $credentialProbe.Service -Account $credentialProbe.Account -Secret $credentialProbe.Secret -TimeoutSeconds $TimeoutSeconds
+        $stages.Add([pscustomobject]@{ name = "credential_probe"; status = "passed" })
+
         Invoke-CheckedProcess -FilePath $installed.UpdatePath -Arguments @("--uninstall", "-s") -TimeoutSeconds $TimeoutSeconds | Out-Null
         $uninstallState = Complete-SquirrelUninstall -InstalledApplication $installed -TimeoutSeconds $TimeoutSeconds
         $userDataRetained = Test-Path -LiteralPath $smoke.database_path -PathType Leaf
@@ -638,12 +732,19 @@ function Invoke-InstallerAcceptance {
             throw "卸载后用户数据库未按当前保留策略留存。"
         }
         $evidence.user_data_retained_after_uninstall = $true
+        Invoke-WindowsCredentialProbe -Action verify -Service $credentialProbe.Service -Account $credentialProbe.Account -Secret $credentialProbe.Secret -TimeoutSeconds $TimeoutSeconds
+        $evidence.system_credential_retained_after_uninstall = $true
         $stages.Add([pscustomobject]@{
             name = "uninstall"
             status = "passed"
             user_data_retained = $true
             squirrel_residue_file_count = @($uninstallState.ResiduePaths).Count
             squirrel_residue_cleaned = (-not $uninstallState.Removed)
+        })
+        $stages.Add([pscustomobject]@{
+            name = "credential_retention"
+            status = "passed"
+            retained_after_uninstall = $true
         })
         $evidence.status = "passed"
         }
@@ -675,9 +776,33 @@ function Invoke-InstallerAcceptance {
                 $stages.Add([pscustomobject]@{ name = "failure_cleanup"; status = "failed"; message = $_.Exception.Message })
             }
         }
+        if ($null -ne $credentialProbe) {
+            try {
+                Invoke-WindowsCredentialProbe `
+                    -Action delete `
+                    -Service $credentialProbe.Service `
+                    -Account $credentialProbe.Account `
+                    -TimeoutSeconds $TimeoutSeconds
+                $stages.Add([pscustomobject]@{ name = "credential_probe_cleanup"; status = "passed" })
+            }
+            catch {
+                $credentialCleanupError = "系统凭据验收探针清理失败。$($_.Exception.Message)"
+                $evidence.status = "failed"
+                $stages.Add([pscustomobject]@{
+                    name = "credential_probe_cleanup"
+                    status = "failed"
+                    message = $credentialCleanupError
+                })
+            }
+            $credentialProbe.Secret = $null
+        }
         $evidence.completed_at = [DateTimeOffset]::UtcNow.ToString("O")
         $evidencePath = Write-AcceptanceEvidence -Evidence $evidence -EvidenceDirectory $EvidenceDirectory
         Write-Information "安装验收证据：$evidencePath" -InformationAction Continue
+    }
+
+    if ($null -ne $credentialCleanupError) {
+        throw $credentialCleanupError
     }
 
     [pscustomobject]@{

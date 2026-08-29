@@ -8,7 +8,7 @@
 ### 待完成
 
 - 使用受控正式证书完成 Authenticode 签名与时间戳验证。
-- 在独立 Windows VM 完成 SmartScreen、重复安装和系统凭据卸载保留检查。
+- 使用正式签名候选在独立 Windows VM 完成发布者信息和 SmartScreen 人工检查。
 - 首个公开版本发布后归档可回滚制品，并把它作为下一版本跨版本升级、数据库迁移和回滚验收基线。
 
 ## [0.1.0] - 2026-08-24（内部候选）
@@ -50,12 +50,15 @@
   其他未知文件或目录仍会阻塞候选发布。
 - 打包态 Python Sidecar 的冷启动等待上限由 15 秒调整为 45 秒，以覆盖干净 Windows 环境的首次扫描与
   解压抖动；源码开发模式仍保持 15 秒，安装验收外层超时和失败证据保持不变。
+- 安装生命周期增加同版本重复安装/再次首启，以及唯一 Windows keyring 探针的卸载保留与主动清理取证；
+  探针值只通过子进程环境传递，不进入参数、日志或验收证据。
+- 将 Forge 使用的 `@electron/packager` 覆盖到 `20.3.0`，统一使用 Electron 的安全解压实现；删除
+  `GHSA-jmr9-qjv8-65gv` 审计豁免，high 级依赖审计恢复为零豁免阻塞。通过 pnpm 补丁将稳定版
+  Forge 7.11.2 的旧回调 hook 适配到 Packager 20 的对象/Promise 接口，并由真实 Windows make 回归锁定。
 
 ### 已知限制
 
 - 当前 Setup 未签名，只能作为受控内部候选；Windows 可能显示未知发布者或 SmartScreen 提示。
-- 尚未完成正式证书签名、跨版本升级、SmartScreen、重复安装和系统凭据卸载保留验证。
+- 尚未完成正式证书签名、跨版本升级和独立 VM SmartScreen 验证。
 - 当前不支持 OCR、原生/流式 gRPC、本地多文件 Proto import、批量执行、数据库恢复或自动备份。
 - 前端主包仍有大于 500 kB 的构建警告。
-- Electron Forge 的 `extract-zip 2.0.1` 传递依赖仍有一项已记录 high 风险；当前仅在校验官方
-  Electron ZIP 固定 SHA-256 后生成内部候选。

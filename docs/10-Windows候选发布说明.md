@@ -4,8 +4,8 @@
 
 当前版本为 `0.1.0` Windows x64 内部候选。它已包含 Electron 应用、独立 Python Sidecar、Alembic
 迁移和冻结 Protobuf 编译器，并在开发机当前用户配置文件完成真实安装、首次启动和卸载回归；但尚未
-进行 Authenticode 签名。GitHub hosted Windows runner 已完成安装生命周期；独立 VM 的 SmartScreen、
-重复安装和跨版本升级仍未验收。
+进行 Authenticode 签名。GitHub hosted Windows runner 已完成安装生命周期；正式签名候选的独立 VM
+SmartScreen 和跨版本升级仍未验收。
 不得将本候选标记为正式稳定版或面向不受控用户公开分发。
 
 ## 2. 生成制品
@@ -53,8 +53,11 @@ SHA-256 只能发现传输或存储篡改，不能证明发布者身份。当前
   Sidecar 并强制退出。
 - Setup.exe 在开发机当前用户完成安装、Sidecar/Alembic/renderer 就绪、回环 API 取证和卸载；
   卸载后用户数据库保留，安装根由门禁清理完成。
+- 生命周期已覆盖同版本重复安装/再次首启，以及唯一 Windows keyring 探针的卸载保留和主动清理。
+- Forge 的 Packager 已固定为 `20.3.0` 并使用 Electron 安全解压实现，high 级 pnpm 审计无 GHSA 豁免；
+  稳定版 Forge 7.11.2 通过受锁文件追踪的最小 hook 兼容补丁调用 Packager 20，真实 Windows make 已通过。
 
-当前仍未验证独立 VM 的 SmartScreen、重复安装、跨版本升级或系统凭据库保留。
+当前仍未验证正式签名候选的独立 VM SmartScreen 或跨版本升级。
 
 ## 5. 自动化安装验收
 
@@ -83,6 +86,9 @@ pwsh -NoProfile -File scripts/windows-release/Invoke-InstallerAcceptance.ps1 `
 Electron/Squirrel 固定墓碑残留会被精确白名单取证并由测试脚本清理，任意未知残留都会失败。传入
 `-PreviousArtifactRoot <上一候选 out/make>` 时还会
 执行跨版本升级并确认数据库路径保持一致；未传入时升级阶段固定记录为 `skipped`。
+没有上一候选时也会再次静默安装当前版本、重新完成首次启动，并确认数据库路径保持一致。卸载前写入
+唯一 Windows keyring 探针，卸载后验证它按保留策略仍可读取，最后由脚本主动清理；任何探针错误或
+清理失败都使门禁失败，凭据值不进入参数、日志或验收 JSON。
 验收模式启动失败时不会打开需要人工关闭的模态对话框，而会原子写入不含会话令牌的错误证据并以
 非零状态退出，生命周期脚本据此报告具体启动错误；就绪证据完成后会先停止 Sidecar，再强制结束专用
 验收进程，避免无交互 runner 被 Electron 退出钩子挂起。外部进程超过默认 180 秒仍会被终止并报告
@@ -139,8 +145,7 @@ Forge 配置对象和 SBOM 子进程都不接收口令字段。CI 可选 Secret 
 2. 在 Windows 干净虚拟机快照中校验 SHA-256 后安装，完成首次启动和核心健康检查。
 3. `0.1.0` 首次发布的跨版本阶段记录为不适用；归档其可回滚制品，并从下一版本开始强制执行
    上一稳定版升级、Alembic 数据迁移和用户数据保留。
-4. 卸载后核对应用文件、用户数据库、备份和操作系统凭据的预期保留/删除范围。
-5. 基于现有 `CHANGELOG.md` 和 `docs/11-Windows安装与首次使用.md` 完成正式签名版本的发布说明、
+4. 基于现有 `CHANGELOG.md` 和 `docs/11-Windows安装与首次使用.md` 完成正式签名版本的发布说明、
    可回滚制品和签名证书轮换/吊销预案。
 
 ## 8. 已知限制
@@ -149,7 +154,3 @@ Forge 配置对象和 SBOM 子进程都不接收口令字段。CI 可选 Secret 
 - 目前只生成 Windows x64 Squirrel 制品，没有 MSI、MSIX、macOS 或 Linux 安装包。
 - 版本仍为 `0.1.0`，尚未建立跨版本升级基线。
 - 前端主包仍有大于 500 kB 的构建警告，不影响本次安装器生成，但后续应按页面拆分优化加载体积。
-- `pnpm audit --audit-level high` 仍报告 Forge 官方兼容的 `@electron/packager 18` 传递依赖
-  `extract-zip 2.0.1` 的一项 high 风险；审计建议的 `2.0.2` 尚未发布。当前构建在解压前校验
-  Electron 官方 ZIP 的固定 SHA-256，并仅限内部候选使用；正式发布前必须升级到 Forge 支持的修复版本
-  或完成等效修复与专项安全验证。

@@ -55,8 +55,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      # Forge 7 still depends on extract-zip 2.0.1; GHSA-jmr9-qjv8-65gv has no
-      # published patched package yet. Keep every other high advisory blocking.
       - run: pnpm audit --audit-level high
 
   desktop:
