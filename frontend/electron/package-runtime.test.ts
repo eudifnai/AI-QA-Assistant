@@ -185,11 +185,40 @@ describe("Electron package runtime", () => {
     expect(spec.env.AI_QA_ELECTRON_ZIP_DIR).toBe(dirname(ELECTRON_ZIP_PATH));
   });
 
+  it("can make a signed installer from an already packaged application", () => {
+    const spec = buildForgeLaunchSpec(
+      FRONTEND_DIRECTORY,
+      ELECTRON_ZIP_PATH,
+      FORGE_PACKAGE_JSON_PATH,
+      {
+        CI: "1",
+        AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+        AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+        AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME: "ai-qa-signing",
+        AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: "public-trust",
+      },
+      "make",
+      true,
+    );
+
+    expect(spec.args.slice(-2)).toEqual(["make", "--skip-package"]);
+  });
+
   it("builds an SBOM process without forwarding signing secrets", () => {
     const spec = buildReleaseSbomLaunchSpec(FRONTEND_DIRECTORY, {
       CI: "1",
       AI_QA_WINDOWS_SIGN_CERTIFICATE_PASSWORD: "ai-secret",
       WINDOWS_CERTIFICATE_PASSWORD: "forge-secret",
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: "oidc-request-token",
+      ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example.test",
+      AZURE_CLIENT_SECRET: "azure-secret",
+      AZURE_CLIENT_ID: "client-id",
+      AZURE_TENANT_ID: "tenant-id",
+      AZURE_SUBSCRIPTION_ID: "subscription-id",
+      AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+      AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+      AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME: "ai-qa-signing",
+      AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: "public-trust",
     });
 
     expect(spec).toEqual({
@@ -248,6 +277,41 @@ describe("Electron package runtime", () => {
       });
       expect(metadataText).not.toContain("certificate");
       expect(metadataText).not.toContain("password");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("records Artifact Signing as requiring post-build verification", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ai-qa-electron-release-test-"));
+    try {
+      const artifactDirectory = join(root, "out", "make", "squirrel.windows", "x64");
+      mkdirSync(artifactDirectory, { recursive: true });
+      for (const name of [
+        "AI-QA-Assistant-Setup.exe",
+        "AIQAAssistant-0.1.0-full.nupkg",
+        "RELEASES",
+      ]) {
+        writeFileSync(join(artifactDirectory, name), name);
+      }
+      writeFileSync(
+        join(root, "out", "make", "ai-qa-assistant.cdx.json"),
+        '{"bomFormat":"CycloneDX","specVersion":"1.6"}\n',
+      );
+
+      const metadataPath = await writeReleaseMetadata(root, {
+        appVersion: "0.1.0",
+        platform: "win32",
+        arch: "x64",
+        signingMode: "artifact_signing",
+      });
+      const metadata = JSON.parse(readFileSync(metadataPath, "utf8")) as {
+        signing: { mode: string; verification: string };
+      };
+      expect(metadata.signing).toEqual({
+        mode: "artifact_signing",
+        verification: "required_after_build",
+      });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

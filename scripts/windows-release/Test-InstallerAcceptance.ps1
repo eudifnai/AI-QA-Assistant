@@ -202,7 +202,7 @@ try {
     Assert-True -Condition (@(Get-ChildItem -LiteralPath $evidenceDirectory -File).Count -eq 1) -Message "每次验收只能生成一份汇总证据。"
     Assert-Throws -Action {
         Invoke-InstallerAcceptance -ArtifactRoot $testRoot -Mode Validate -RequireSignedArtifacts -EvidenceDirectory $evidenceDirectory | Out-Null
-    } -ExpectedMessage "发布元数据未声明 PFX 签名"
+    } -ExpectedMessage "发布元数据未声明受支持的正式签名模式"
 
     [System.IO.File]::AppendAllText($release.SetupPath, "tampered")
     Assert-Throws -Action {

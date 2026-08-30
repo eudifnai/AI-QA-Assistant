@@ -12,7 +12,7 @@ interface SigningModule {
     environment: NodeJS.ProcessEnv,
   ) => {
     environment: NodeJS.ProcessEnv;
-    mode: "pfx" | "unsigned_internal_candidate";
+    mode: "artifact_signing" | "pfx" | "unsigned_internal_candidate";
   };
   resolveWindowsSigningConfig: (
     environment: NodeJS.ProcessEnv,
@@ -21,6 +21,12 @@ interface SigningModule {
 
 const moduleRequire = createRequire(import.meta.url);
 const signing = moduleRequire("./release-signing.cjs") as SigningModule;
+const artifactSigningHook = moduleRequire("./artifact-signing-hook.cjs") as {
+  buildArtifactSigningLaunchSpec: (filePath: string) => {
+    executable: string;
+    args: string[];
+  };
+};
 
 describe("Windows release signing config", () => {
   it("keeps the internal candidate unsigned when no certificate is configured", () => {
@@ -75,6 +81,78 @@ describe("Windows release signing config", () => {
         continueOnError: false,
       });
       expect(JSON.stringify(config)).not.toContain("sensitive-password");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the Artifact Signing hook only with a complete service configuration", () => {
+    const prepared = signing.buildWindowsSigningEnvironment({
+      CI: "1",
+      AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+      AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+      AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME: "ai-qa-signing",
+      AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: "public-trust",
+    });
+
+    expect(prepared.mode).toBe("artifact_signing");
+    expect(prepared.environment).toMatchObject({
+      CI: "1",
+      AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+      AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+      AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME: "ai-qa-signing",
+      AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: "public-trust",
+    });
+    expect(signing.resolveWindowsSigningConfig(prepared.environment)).toEqual({
+      hookModulePath: resolve("electron", "artifact-signing-hook.cjs"),
+      continueOnError: false,
+    });
+
+    expect(() =>
+      signing.buildWindowsSigningEnvironment({
+        AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+        AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+      }),
+    ).toThrow("Artifact Signing 配置不完整");
+  });
+
+  it("rejects ambiguous PFX and Artifact Signing configuration", () => {
+    expect(() =>
+      signing.buildWindowsSigningEnvironment({
+        AI_QA_WINDOWS_SIGN_MODE: "artifact_signing",
+        AI_QA_ARTIFACT_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+        AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME: "ai-qa-signing",
+        AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: "public-trust",
+        AI_QA_WINDOWS_SIGN_CERTIFICATE_FILE: "release.pfx",
+        AI_QA_WINDOWS_SIGN_CERTIFICATE_PASSWORD: "secret",
+      }),
+    ).toThrow("不能同时配置 PFX 和 Artifact Signing");
+  });
+
+  it("launches the Artifact Signing hook with an argument array", () => {
+    const root = mkdtempSync(join(tmpdir(), "ai-qa-signing-hook-test-"));
+    try {
+      const executablePath = join(root, "AI QA Assistant.exe");
+      writeFileSync(executablePath, "fixture executable");
+
+      expect(
+        artifactSigningHook.buildArtifactSigningLaunchSpec(executablePath),
+      ).toEqual({
+        executable: "pwsh",
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-File",
+          resolve("electron", "invoke-artifact-signing.ps1"),
+          "-FilePath",
+          resolve(executablePath),
+        ],
+      });
+      expect(() =>
+        artifactSigningHook.buildArtifactSigningLaunchSpec(
+          join(root, "missing.exe"),
+        ),
+      ).toThrow("候选文件不存在");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

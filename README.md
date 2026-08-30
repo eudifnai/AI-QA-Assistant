@@ -192,8 +192,9 @@ SHA-256 均匹配的 `electron-v<version>-<platform>-<arch>.zip` 才会交给 Fo
 `electron:make` 在 Windows 上生成未签名的 Squirrel.Windows 内部安装器候选，包括 Setup.exe、
 full.nupkg、RELEASES 和根级 `SHA256SUMS.txt`。`installer:validate` 只校验制品和清单，不安装应用；
 Windows CI 还会在一次性 runner 中执行安装、后端迁移与首次启动、卸载及用户数据库保留验收。make
-会生成 CycloneDX 1.6 SBOM、脱敏发布元数据和五项文件校验清单，并提供只经 CI Secret 注入的可选 PFX
-签名入口。校验和与签名入口不能替代正式证书的实际签名结论，当前候选不得作为正式公开版本分发。详见
+会生成 CycloneDX 1.6 SBOM、脱敏发布元数据和五项文件校验清单。手工 `formal` 门禁使用 GitHub
+OIDC 登录 Azure Artifact Signing，先签 Electron package 中的 PE，再通过 Forge hook 签 Squirrel
+生成的 PE；本地 PFX 入口仅为兼容用途。校验和与签名入口不能替代正式账户上的实际签名结论。详见
 `docs/10-Windows候选发布说明.md`。
 
 当前 `0.1.0` 候选已在开发机当前用户配置文件完成一次真实 Setup 生命周期：安装、Sidecar/Alembic/

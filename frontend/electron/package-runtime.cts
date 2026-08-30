@@ -24,7 +24,10 @@ export interface ForgeLaunchSpec {
 
 export type ForgeCommand = "package" | "make";
 
-export type WindowsSigningMode = "pfx" | "unsigned_internal_candidate";
+export type WindowsSigningMode =
+  | "artifact_signing"
+  | "pfx"
+  | "unsigned_internal_candidate";
 
 interface WindowsSigningModule {
   buildWindowsSigningEnvironment: (environment: NodeJS.ProcessEnv) => {
@@ -157,6 +160,7 @@ export function buildForgeLaunchSpec(
   forgeCliPackageJsonPath: string,
   environment: NodeJS.ProcessEnv = process.env,
   command: ForgeCommand = "package",
+  skipPackage = false,
 ): ForgeLaunchSpec {
   const signing = buildWindowsSigningEnvironment(environment);
   return {
@@ -164,6 +168,7 @@ export function buildForgeLaunchSpec(
     args: [
       join(dirname(forgeCliPackageJsonPath), "dist", "electron-forge.js"),
       command,
+      ...(command === "make" && skipPackage ? ["--skip-package"] : []),
     ],
     cwd: frontendDirectory,
     env: {
@@ -186,6 +191,16 @@ export function buildReleaseSbomLaunchSpec(
     "WINDOWS_CERTIFICATE_FILE",
     "WINDOWS_CERTIFICATE_PASSWORD",
     "WINDOWS_TIMESTAMP_SERVER",
+    "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+    "ACTIONS_ID_TOKEN_REQUEST_URL",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_CLIENT_ID",
+    "AZURE_TENANT_ID",
+    "AZURE_SUBSCRIPTION_ID",
+    "AI_QA_WINDOWS_SIGN_MODE",
+    "AI_QA_ARTIFACT_SIGNING_ENDPOINT",
+    "AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME",
+    "AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME",
   ]) {
     delete safeEnvironment[name];
   }
@@ -279,7 +294,7 @@ export async function writeReleaseMetadata(
     signing: {
       mode: options.signingMode,
       verification:
-        options.signingMode === "pfx"
+        options.signingMode !== "unsigned_internal_candidate"
           ? "required_after_build"
           : "not_applicable_internal_candidate",
     },
@@ -368,6 +383,7 @@ async function runLaunchSpec(launch: ForgeLaunchSpec, label: string): Promise<vo
 async function runElectronForge(
   frontendDirectory: string,
   command: ForgeCommand,
+  skipPackage = false,
 ): Promise<void> {
   const sidecarPath = sidecarExecutablePath(frontendDirectory);
   if (!existsSync(sidecarPath)) {
@@ -406,6 +422,7 @@ async function runElectronForge(
     forgeCliPackageJsonPath,
     process.env,
     command,
+    skipPackage,
   );
 
   console.log(`使用已校验 Electron ZIP：${electronZipPath}`);
@@ -416,12 +433,15 @@ export async function packageElectron(frontendDirectory: string): Promise<void> 
   await runElectronForge(frontendDirectory, "package");
 }
 
-export async function makeElectron(frontendDirectory: string): Promise<void> {
+export async function makeElectron(
+  frontendDirectory: string,
+  skipPackage = false,
+): Promise<void> {
   await rm(resolve(frontendDirectory, "out", "make"), {
     recursive: true,
     force: true,
   });
-  await runElectronForge(frontendDirectory, "make");
+  await runElectronForge(frontendDirectory, "make", skipPackage);
   const sbomLaunch = buildReleaseSbomLaunchSpec(frontendDirectory);
   await runLaunchSpec(sbomLaunch, "CycloneDX SBOM 生成");
   const packageJson = JSON.parse(

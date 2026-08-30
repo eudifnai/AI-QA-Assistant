@@ -120,7 +120,7 @@ function Get-VerifiedReleaseArtifacts {
     ) {
         throw "发布元数据与 Squirrel 制品不一致。"
     }
-    if ($metadata.signing.mode -notin @("pfx", "unsigned_internal_candidate")) {
+    if ($metadata.signing.mode -notin @("artifact_signing", "pfx", "unsigned_internal_candidate")) {
         throw "发布元数据包含未知签名模式。"
     }
     if (
@@ -170,8 +170,8 @@ function Assert-ReleaseAuthenticode {
         [object]$Release
     )
 
-    if ($Release.SigningMode -ne "pfx") {
-        throw "发布元数据未声明 PFX 签名，不能执行正式签名门禁。"
+    if ($Release.SigningMode -notin @("artifact_signing", "pfx")) {
+        throw "发布元数据未声明受支持的正式签名模式，不能执行正式签名门禁。"
     }
     $temporaryRoot = Join-Path (
         [System.IO.Path]::GetTempPath()
@@ -659,7 +659,10 @@ function Invoke-InstallerAcceptance {
 
     try {
         $stages.Add([pscustomobject]@{ name = "artifact_validation"; status = "passed" })
-        if ($RequireSignedArtifacts -or $currentRelease.SigningMode -eq "pfx") {
+        if (
+            $RequireSignedArtifacts -or
+            $currentRelease.SigningMode -in @("artifact_signing", "pfx")
+        ) {
             $authenticode = Assert-ReleaseAuthenticode -Release $currentRelease
             $evidence.authenticode = $authenticode
             $stages.Add([pscustomobject]@{

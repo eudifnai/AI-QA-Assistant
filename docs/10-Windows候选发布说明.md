@@ -106,17 +106,46 @@ Electron/Node 在干净 runner 上使用同一个临时目录边界。
 必须归档可回滚的 `0.1.0` 制品，作为下一版本的强制升级基线。验收 JSON 默认只存在于临时 runner，
 不上传包含本机路径和制品哈希的文件。
 对已经推送到 GitHub 的候选引用，可从 Actions 界面通过 `workflow_dispatch` 手动重跑同一质量工作流；
-默认选择 `internal`，仅用于未签名内部候选；正式候选必须选择 `formal`。后者在 PFX/口令 Secret
-缺失时立即失败，并在构建后以 `-RequireSignedArtifacts` 强制验证 Authenticode 和可信时间戳。
-当前未提交 working tree 仍不能通过该入口直接验证。
+默认选择 `internal`，仅用于未签名内部候选；正式候选必须选择 `formal`。后者在任一 Azure/OIDC/
+Artifact Signing Variable 缺失时立即失败，并在构建后以 `-RequireSignedArtifacts` 强制验证
+Authenticode 和可信时间戳。
+只有已推送到 GitHub 的 commit 才能通过该入口验证；本地未提交或未推送改动不构成 CI 证据。
 `codex/release-*` 候选分支的 push 会自动运行相同门禁，可用于合并 `main` 前的干净 runner 验证。
 成功的非 PR Windows Job 会生成 `windows-release-candidate-<run_id>` artifact，保留 90 天，内容
 仅限 Setup、full.nupkg、RELEASES、SBOM、脱敏发布元数据和 SHA-256 清单，不包含生命周期 JSON、
 PFX、口令或 runner 本机路径。下一版本手动运行时填写该正整数 `previous_run_id`，工作流会从当前
 仓库下载对应候选，完成哈希校验后传入 `-PreviousArtifactRoot` 执行真实升级生命周期。
-本次归档名为 `windows-release-candidate-32873435673`，截至复核时未过期，计划保留至 2026-11-23。
+最近一次已通过的内部归档名为 `windows-release-candidate-33264944147`，计划保留至 2026-11-27。
 
-## 6. 受控 PFX 签名
+## 6. Azure Artifact Signing 正式签名
+
+公开发布优先使用 Azure Artifact Signing（原 Trusted Signing）Public Trust。该服务把代码签名私钥
+保留在合规签名服务中，GitHub runner 只通过短期 OIDC 身份获得签名权限，不需要获取或上传 PFX。
+
+先在 Azure 完成以下一次性配置：
+
+1. 在订阅中注册 `Microsoft.CodeSigning` 资源提供程序，创建 Artifact Signing Account。
+2. 完成组织或个人身份验证，并创建 `Public Trust` Certificate Profile。
+3. 创建 Microsoft Entra App Registration；为要运行正式门禁的精确 GitHub 仓库和 release 分支添加
+   Federated Credential，Issuer 为 `https://token.actions.githubusercontent.com`，Audience 为
+   `api://AzureADTokenExchange`。不要给任意仓库或任意分支通配授权。
+4. 在 Certificate Profile 范围给该应用分配
+   `Artifact Signing Certificate Profile Signer` 角色，不授予 Owner 或 Contributor。
+5. 在 GitHub 仓库 Settings → Secrets and variables → Actions → Variables 配置：
+   `AZURE_CLIENT_ID`、`AZURE_TENANT_ID`、`AZURE_SUBSCRIPTION_ID`、
+   `AI_QA_ARTIFACT_SIGNING_ENDPOINT`、`AI_QA_ARTIFACT_SIGNING_ACCOUNT_NAME` 和
+   `AI_QA_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME`。这些都是标识符或服务地址，不包含私钥；
+   不再创建 `AI_QA_WINDOWS_SIGN_PFX_BASE64` 或 `AI_QA_WINDOWS_SIGN_PFX_PASSWORD`。
+
+然后从 GitHub Actions 打开 Quality，选择 Run workflow，把 `release_gate` 设为 `formal`。工作流
+先运行 `electron:package`，再由 `azure/artifact-signing-action@v2` 批量签名 package 目录中的
+EXE/DLL/NODE，最后通过 `electron:make:from-package` 和 Artifact Signing hook 生成并签名 Squirrel
+制品。正式门禁会从 full.nupkg 解包并逐个检查 PE 签名及 RFC 3161 时间戳，不能用 internal 绿色结果替代。
+
+Azure 账户、身份验证、联邦身份和角色分配必须由账户管理员完成；仓库实现不能代替这些外部步骤。未在
+真实 Artifact Signing Account 上完成一次 formal 运行之前，发布结论仍为 No-Go。
+
+## 7. 本地 PFX 兼容入口
 
 本地或受控 runner 只通过进程环境注入证书，不把证书或口令写入仓库、`.env`、SQLite、SBOM、发布
 元数据或日志：
@@ -131,16 +160,16 @@ pnpm installer:validate:signed
 
 证书路径和口令必须同时存在；证书必须是已存在的 `.pfx/.p12`，时间戳 URL 只允许 HTTP/HTTPS，且
 签名失败不能降级成成功候选。构建子进程会把口令映射给 `@electron/windows-sign` 的标准环境变量，
-Forge 配置对象和 SBOM 子进程都不接收口令字段。CI 可选 Secret 名为
-`AI_QA_WINDOWS_SIGN_PFX_BASE64` 和 `AI_QA_WINDOWS_SIGN_PFX_PASSWORD`；缺少两者时继续生成明确标记的
-未签名内部候选，只配置其中之一则失败。临时 PFX 位于 runner 临时目录并在 `always()` 步骤删除。
+Forge 配置对象和 SBOM 子进程都不接收口令字段。该入口只用于本地兼容或既有受控基础设施；GitHub
+formal 工作流固定使用 Artifact Signing，不接收 Base64 PFX。
 
 当前仓库和本机没有受控正式证书，所以本节说明的是已测试的签名入口和门禁，不代表当前 `0.1.0` 制品
 已经签名。
 
-## 7. 下一发布门禁
+## 8. 下一发布门禁
 
-1. 在受控 CI 配置正式 PFX 证书 Secret，通过 `workflow_dispatch` 选择 `formal`，生成候选并观察
+1. 完成 Azure Artifact Signing、OIDC 联邦身份、最小角色与 GitHub Variables 配置，通过
+   `workflow_dispatch` 选择 `formal`，生成候选并观察
    签名/时间戳门禁实际通过；不得以默认 `internal` 的绿色结果替代正式发布证据。
 2. 在 Windows 干净虚拟机快照中校验 SHA-256 后安装，完成首次启动和核心健康检查。
 3. `0.1.0` 首次发布的跨版本阶段记录为不适用；归档其可回滚制品，并从下一版本开始强制执行
@@ -148,7 +177,7 @@ Forge 配置对象和 SBOM 子进程都不接收口令字段。CI 可选 Secret 
 4. 基于现有 `CHANGELOG.md` 和 `docs/11-Windows安装与首次使用.md` 完成正式签名版本的发布说明、
    可回滚制品和签名证书轮换/吊销预案。
 
-## 8. 已知限制
+## 9. 已知限制
 
 - 安装器未签名，Windows 可能显示未知发布者或 SmartScreen 警告。
 - 目前只生成 Windows x64 Squirrel 制品，没有 MSI、MSIX、macOS 或 Linux 安装包。

@@ -25,7 +25,8 @@
     "preelectron:package": "pnpm electron:install",
     "electron:package": "pnpm build && pnpm backend:sidecar && node electron/package-electron.cjs",
     "preelectron:make": "pnpm electron:install",
-    "electron:make": "pnpm build && pnpm backend:sidecar && node electron/make-electron.cjs"
+    "electron:make": "pnpm build && pnpm backend:sidecar && node electron/make-electron.cjs",
+    "electron:make:from-package": "node electron/make-electron.cjs --skip-package"
   },
   "devDependencies": {
     "@electron-forge/cli": "7.11.2",

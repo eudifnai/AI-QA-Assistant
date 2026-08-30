@@ -7,9 +7,17 @@
 
 ### 待完成
 
-- 使用受控正式证书完成 Authenticode 签名与时间戳验证。
+- 配置真实 Azure Artifact Signing Account、Public Trust Certificate Profile、OIDC 联邦身份与
+  GitHub Variables，完成一次 `formal` Authenticode 签名和时间戳验证。
 - 使用正式签名候选在独立 Windows VM 完成发布者信息和 SmartScreen 人工检查。
 - 首个公开版本发布后归档可回滚制品，并把它作为下一版本跨版本升级、数据库迁移和回滚验收基线。
+
+### 工程与发布
+
+- 正式 Windows 门禁从 Base64 PFX Secret 迁移到 Azure Artifact Signing + GitHub OIDC；先批量签名
+  Electron package 内的 PE，再通过 Forge `--skip-package` 与签名 hook 生成 Squirrel 制品，并继续
+  强制验证 Setup 和 full.nupkg 内全部 PE 的 Authenticode 与 RFC 3161 时间戳。未签名内部候选和本地
+  PFX 兼容入口保持可用。
 
 ## [0.1.0] - 2026-08-24（内部候选）
 
