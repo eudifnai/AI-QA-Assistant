@@ -49,7 +49,10 @@ def test_formal_release_gate_cannot_skip_signing() -> None:
     assert "files-folder-recurse: true" in workflow
     assert "files-folder-filter: exe,dll,node" in workflow
     assert "pnpm electron:make:from-package" in workflow
-    assert '"electron:make:from-package": "pnpm --dir frontend electron:make:from-package"' in package_json
+    assert (
+        '"electron:make:from-package": "pnpm --dir frontend electron:make:from-package"'
+        in package_json
+    )
     assert 'AI_QA_WINDOWS_SIGN_MODE: "artifact_signing"' in workflow
     assert "-RequireSignedArtifacts" in workflow
     assert "id-token: write" not in workflow.split("\njobs:\n", maxsplit=1)[0]
