@@ -33,6 +33,12 @@ import {
 } from "./desktop-bridge.cjs";
 import { saveReportArtifact } from "./report-export.cjs";
 import {
+  assertMinimumWindowNavigationLayout,
+  MAIN_WINDOW_MIN_HEIGHT,
+  MAIN_WINDOW_MIN_WIDTH,
+  MINIMUM_WINDOW_NAVIGATION_TEST_IDS,
+} from "./minimum-window-layout.cjs";
+import {
   APPLICATION_HOST,
   APPLICATION_PROTOCOL,
   contentSecurityPolicy,
@@ -59,6 +65,38 @@ if (ACCEPTANCE_SMOKE_PATH !== null) {
 
 let backendRuntime: BackendRuntime | null = null;
 let mainWindow: BrowserWindow | null = null;
+
+async function verifyMinimumWindowNavigation(window: BrowserWindow): Promise<void> {
+  window.setSize(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
+  const testIds = JSON.stringify(MINIMUM_WINDOW_NAVIGATION_TEST_IDS);
+  const layout: unknown = await window.webContents.executeJavaScript(`
+    (() => new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const testIds = ${testIds};
+          resolve({
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            controls: testIds.map((testId) => {
+              const element = document.querySelector('[data-testid="' + testId + '"]');
+              if (element === null) return { testId };
+              const bounds = element.getBoundingClientRect();
+              return {
+                testId,
+                left: bounds.left,
+                right: bounds.right,
+                top: bounds.top,
+                bottom: bounds.bottom,
+              };
+            }),
+          });
+        });
+      });
+    }))()
+  `);
+  assertMinimumWindowNavigationLayout(layout);
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -121,8 +159,8 @@ async function createMainWindow(): Promise<BrowserWindow> {
     title: "AI QA Assistant",
     width: 1080,
     height: 720,
-    minWidth: 760,
-    minHeight: 520,
+    minWidth: MAIN_WINDOW_MIN_WIDTH,
+    minHeight: MAIN_WINDOW_MIN_HEIGHT,
     center: true,
     show: false,
     webPreferences: {
@@ -248,6 +286,7 @@ async function startApplication(): Promise<void> {
   registerDesktopHandlers();
   mainWindow = await createMainWindow();
   if (ACCEPTANCE_SMOKE_PATH !== null) {
+    await verifyMinimumWindowNavigation(mainWindow);
     const userDataPath = app.getPath("userData");
     await writeAcceptanceSmokeEvidence({
       evidencePath: ACCEPTANCE_SMOKE_PATH,

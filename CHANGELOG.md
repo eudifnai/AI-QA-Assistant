@@ -14,6 +14,10 @@
 
 ### 工程与发布
 
+- 修复 Electron 声明支持的最小窗口下主导航被裁切且无法访问的问题；导航在窄窗口自动换行，安装冒烟
+  会在 `760×520` 检查任务状态、全部入口和页面水平溢出。
+- 修复全新 SQLite 数据库并发首次读取设置时单例记录重复插入并返回 500 的竞态；设置仓储改用原子
+  upsert，并增加确定性并发回归测试。
 - 正式 Windows 门禁从 Base64 PFX Secret 迁移到 Azure Artifact Signing + GitHub OIDC；先批量签名
   Electron package 内的 PE，再通过 Forge `--skip-package` 与签名 hook 生成 Squirrel 制品，并继续
   强制验证 Setup 和 full.nupkg 内全部 PE 的 Authenticode 与 RFC 3161 时间戳。未签名内部候选和本地

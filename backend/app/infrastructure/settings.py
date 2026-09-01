@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 from sqlmodel import Field, Session, SQLModel
 
@@ -49,27 +50,25 @@ class SqlModelSettingsRepository:
 
     def upsert(self, settings: AppSettings) -> AppSettings:
         with Session(self._engine) as session:
+            values = {
+                "id": SETTINGS_SINGLETON_ID,
+                "theme": settings.theme.value,
+                "model_mode": settings.model_mode.value,
+                "model_provider": settings.model_provider.value,
+                "model_name": settings.model_name,
+                "base_url": settings.base_url,
+                "cloud_data_consent": settings.cloud_data_consent,
+                "updated_at": settings.updated_at,
+            }
+            statement = insert(AppSettingsRecord).values(values)
+            session.execute(
+                statement.on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={key: value for key, value in values.items() if key != "id"},
+                )
+            )
+            session.commit()
             record = session.get(AppSettingsRecord, SETTINGS_SINGLETON_ID)
             if record is None:
-                record = AppSettingsRecord(
-                    id=SETTINGS_SINGLETON_ID,
-                    theme=settings.theme.value,
-                    model_mode=settings.model_mode.value,
-                    model_provider=settings.model_provider.value,
-                    model_name=settings.model_name,
-                    base_url=settings.base_url,
-                    cloud_data_consent=settings.cloud_data_consent,
-                    updated_at=settings.updated_at,
-                )
-            else:
-                record.theme = settings.theme.value
-                record.model_mode = settings.model_mode.value
-                record.model_provider = settings.model_provider.value
-                record.model_name = settings.model_name
-                record.base_url = settings.base_url
-                record.cloud_data_consent = settings.cloud_data_consent
-                record.updated_at = settings.updated_at
-            session.add(record)
-            session.commit()
-            session.refresh(record)
+                raise RuntimeError("设置单例写入后无法读取。")
             return _to_domain(record)

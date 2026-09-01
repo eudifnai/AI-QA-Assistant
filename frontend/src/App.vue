@@ -63,7 +63,11 @@ onBeforeUnmount(() => taskEventStore.stop());
         :type="taskEventStatus.type"
         effect="plain"
       >{{ taskEventStatus.label }}</el-tag>
-      <el-button :type="page === 'workspaces' ? 'primary' : 'default'" @click="page = 'workspaces'">
+      <el-button
+        data-testid="open-workspaces"
+        :type="page === 'workspaces' ? 'primary' : 'default'"
+        @click="page = 'workspaces'"
+      >
         工作空间
       </el-button>
       <el-button
@@ -149,6 +153,8 @@ onBeforeUnmount(() => taskEventStore.stop());
   z-index: 10;
   top: 0;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   padding: 12px clamp(20px, 5vw, 72px);
@@ -159,5 +165,12 @@ onBeforeUnmount(() => taskEventStore.stop());
 
 .app-nav .el-button + .el-button {
   margin-left: 0;
+}
+
+@media (max-width: 900px) {
+  .app-nav {
+    justify-content: flex-start;
+    padding: 8px 12px;
+  }
 }
 </style>
